@@ -1584,6 +1584,228 @@ img, video, canvas, svg { max-width: 100%; }
       <div class="po-tw-past-body" id="poTwPastBody" style="display:none"></div>
     </div>
   </div>
+
+  <!-- STRAVA — workouts logged in Lyfta are shared to Strava, then
+       pulled in here. Tokens live in localStorage on this device. -->
+  <style>
+    .sv-section { margin-top: 22px; }
+    .sv-card { background: var(--bg-card); border: 1px solid rgba(252,76,2,0.14); border-radius: 18px; padding: 20px 18px 16px; }
+    .sv-brand { display: inline-flex; align-items: center; gap: 8px; }
+    .sv-mark { width: 22px; height: 22px; border-radius: 6px; background: #FC4C02; display: inline-flex; align-items: center; justify-content: center; }
+    .sv-brand-text { font-weight: 800; font-size: 13px; letter-spacing: 0.16em; color: var(--text-1); }
+    .sv-disc { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; padding: 12px 6px 6px; }
+    .sv-disc .sv-brand { margin-bottom: 10px; }
+    .sv-disc-title { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+    .sv-disc-sub { font-size: 13px; color: var(--text-3); max-width: 300px; line-height: 1.5; margin-bottom: 14px; }
+    .sv-connect { padding: 12px 22px; border-radius: 999px; border: 0; background: #FC4C02; color: #fff; font-family: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer; box-shadow: 0 6px 20px rgba(252,76,2,0.30); transition: transform 0.12s; }
+    .sv-connect:hover { transform: translateY(-1px); }
+    .sv-connect:disabled { opacity: 0.5; cursor: default; transform: none; }
+    .sv-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+    .sv-who { font-size: 11px; color: var(--text-3); margin-left: 4px; }
+    .sv-head-right { display: flex; align-items: center; gap: 10px; }
+    .sv-updated { font-size: 11px; color: var(--text-3); font-family: var(--font-mono); }
+    .sv-refresh { width: 32px; height: 32px; border-radius: 50%; background: rgba(255,255,255,0.04); border: 1px solid var(--border); color: var(--text-2); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 0.4s; }
+    .sv-refresh.spin { transform: rotate(360deg); }
+    .sv-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
+    .sv-stat { background: rgba(255,255,255,0.025); border: 1px solid var(--border); border-radius: 12px; padding: 12px 8px; text-align: center; }
+    .sv-stat-label { font-size: 10px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.14em; font-weight: 700; margin-bottom: 7px; }
+    .sv-stat-val { font-size: 22px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -0.03em; }
+    .sv-stat-sub { font-size: 10px; color: var(--text-3); margin-top: 5px; font-family: var(--font-mono); }
+    .sv-list-title { font-size: 10px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.18em; font-weight: 700; margin-bottom: 8px; }
+    .sv-list { list-style: none; margin: 0; padding: 0; }
+    .sv-item { border-top: 1px solid var(--border); }
+    .sv-row { width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px 2px; background: none; border: 0; color: inherit; font-family: inherit; text-align: left; cursor: pointer; }
+    .sv-ico { width: 34px; height: 34px; flex-shrink: 0; border-radius: 10px; background: rgba(252,76,2,0.10); display: flex; align-items: center; justify-content: center; font-size: 16px; }
+    .sv-main { flex: 1; min-width: 0; }
+    .sv-name { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sv-meta { font-size: 11.5px; color: var(--text-3); margin-top: 3px; font-family: var(--font-mono); }
+    .sv-arrow { color: var(--text-4); font-size: 12px; transition: transform 0.2s; }
+    .sv-item.open .sv-arrow { transform: rotate(180deg); }
+    .sv-detail { display: none; padding: 0 2px 14px 46px; font-size: 12.5px; color: var(--text-2); line-height: 1.6; }
+    .sv-item.open .sv-detail { display: block; }
+    .sv-desc { white-space: pre-wrap; margin-bottom: 8px; }
+    .sv-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .sv-chip { font-size: 11px; font-family: var(--font-mono); padding: 3px 8px; border-radius: 999px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); color: var(--text-2); }
+    .sv-link { color: #FC4C02; text-decoration: none; font-size: 11.5px; font-weight: 600; }
+    .sv-empty { font-size: 13px; color: var(--text-3); padding: 12px 2px; text-align: center; }
+    .sv-err { background: rgba(255,107,107,0.08); border: 1px solid rgba(255,107,107,0.28); color: var(--bad); padding: 10px 12px; border-radius: 10px; font-size: 11.5px; font-family: var(--font-mono); margin-bottom: 14px; word-break: break-word; }
+    .sv-disconnect { display: block; margin: 12px auto 0; background: none; border: 0; color: var(--text-3); font-family: inherit; font-size: 11px; cursor: pointer; }
+    .sv-disconnect:hover { color: var(--text-2); text-decoration: underline; }
+    @media (max-width: 380px) { .sv-stat-val { font-size: 19px; } }
+  </style>
+  <div class="sv-section">
+    <div class="wt-divider"><span>STRAVA</span></div>
+    <div class="sv-card">
+      <div id="svDisc" class="sv-disc">
+        <div class="sv-brand"><span class="sv-mark"><svg viewBox="0 0 24 24" width="13" height="13" fill="#fff" aria-hidden="true"><path d="M15.4 17.9l-2.1-4.1h-3.1l5.2 10.2 5.1-10.2h-3.1zM10.4 8.3l2.8 5.5h4.2L10.4 0 3.4 13.8h4.2z"/></svg></span><span class="sv-brand-text">STRAVA</span></div>
+        <div class="sv-disc-title">Not connected</div>
+        <div class="sv-disc-sub">Log workouts in Lyfta with Strava sharing on, and they'll show up here automatically.</div>
+        <button id="svConnectBtn" class="sv-connect" type="button">Connect Strava</button>
+      </div>
+      <div id="svConn" style="display:none">
+        <div class="sv-head">
+          <div class="sv-brand"><span class="sv-mark"><svg viewBox="0 0 24 24" width="13" height="13" fill="#fff" aria-hidden="true"><path d="M15.4 17.9l-2.1-4.1h-3.1l5.2 10.2 5.1-10.2h-3.1zM10.4 8.3l2.8 5.5h4.2L10.4 0 3.4 13.8h4.2z"/></svg></span><span class="sv-brand-text">STRAVA</span><span class="sv-who" id="svWho"></span></div>
+          <div class="sv-head-right">
+            <span id="svUpdated" class="sv-updated">—</span>
+            <button id="svRefresh" class="sv-refresh" type="button" aria-label="Refresh"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M20.49 15A9 9 0 1 1 5.64 5.64L23 10"/></svg></button>
+          </div>
+        </div>
+        <div id="svErr" class="sv-err" style="display:none"></div>
+        <div class="sv-stats">
+          <div class="sv-stat"><div class="sv-stat-label">This week</div><div class="sv-stat-val" id="svWkCount">—</div><div class="sv-stat-sub">workouts</div></div>
+          <div class="sv-stat"><div class="sv-stat-label">Time</div><div class="sv-stat-val" id="svWkTime">—</div><div class="sv-stat-sub">moving</div></div>
+          <div class="sv-stat"><div class="sv-stat-label">Avg HR</div><div class="sv-stat-val" id="svWkHr">—</div><div class="sv-stat-sub">bpm</div></div>
+        </div>
+        <div class="sv-list-title">Recent activities</div>
+        <ul class="sv-list" id="svList"><li class="sv-empty">Loading…</li></ul>
+        <button id="svDisconnectBtn" class="sv-disconnect" type="button">Disconnect</button>
+      </div>
+    </div>
+  </div>
+  <script>
+  (function () {
+    const KEY = 'strava_tokens_v1';
+    const REDIRECT = window.location.origin + '/api/strava-callback';
+    function load() { try { return JSON.parse(localStorage.getItem(KEY)); } catch { return null; } }
+    function save(t) { try { localStorage.setItem(KEY, JSON.stringify(t)); } catch {} }
+    function wipe() { try { localStorage.removeItem(KEY); } catch {} }
+    if (location.hash && location.hash.indexOf('strava_access') !== -1) {
+      const h = new URLSearchParams(location.hash.slice(1));
+      const access = h.get('strava_access');
+      if (access) {
+        save({ access, refresh: h.get('strava_refresh'), expires: Number(h.get('strava_expires')) || Date.now() + 5 * 3600e3, name: h.get('strava_name') || '' });
+        history.replaceState(null, '', location.pathname + location.search);
+      }
+    }
+    const $ = (id) => document.getElementById(id);
+    const errEl = $('svErr');
+    function showErr(m) { errEl.textContent = m || ''; errEl.style.display = m ? 'block' : 'none'; }
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c])); }
+
+    $('svConnectBtn').addEventListener('click', () => {
+      const clientId = window.DASH_STRAVA_CLIENT_ID;
+      if (!clientId) { alert('Strava isn\'t set up yet — add STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET in Vercel, then redeploy.'); return; }
+      location.href = 'https://www.strava.com/oauth/authorize'
+        + '?client_id='       + encodeURIComponent(clientId)
+        + '&redirect_uri='    + encodeURIComponent(REDIRECT)
+        + '&response_type=code'
+        + '&approval_prompt=auto'
+        + '&scope='           + encodeURIComponent('read,activity:read_all');
+    });
+    $('svDisconnectBtn').addEventListener('click', () => { wipe(); render(); });
+    $('svRefresh').addEventListener('click', async (e) => {
+      const btn = e.currentTarget; btn.classList.add('spin');
+      try { await loadData(); } finally { setTimeout(() => btn.classList.remove('spin'), 600); }
+    });
+
+    async function refreshTok(t) {
+      if (!t.refresh) return null;
+      try {
+        const r = await fetch('/api/strava-refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: t.refresh }) });
+        const j = await r.json();
+        if (j.access_token) {
+          const next = { ...t, access: j.access_token, refresh: j.refresh_token || t.refresh, expires: j.expires_at ? j.expires_at * 1000 : Date.now() + 5 * 3600e3 };
+          save(next); return next;
+        }
+      } catch {}
+      return null;
+    }
+    async function svFetch(path, retried) {
+      let t = load(); if (!t) throw new Error('not connected');
+      if (t.expires && Date.now() > t.expires - 60000) { const n = await refreshTok(t); if (n) t = n; }
+      const [p, qs] = path.split('?');
+      const params = new URLSearchParams(qs || ''); params.set('path', p);
+      const r = await fetch('/api/strava-data?' + params.toString(), { headers: { 'Authorization': 'Bearer ' + t.access, 'Accept': 'application/json' } });
+      if (r.status === 401 && !retried) { if (await refreshTok(t)) return svFetch(path, true); throw new Error('Strava login expired — disconnect and connect again.'); }
+      if (!r.ok) throw new Error('Strava ' + r.status + ': ' + (await r.text()));
+      return await r.json();
+    }
+
+    const ICONS = { WeightTraining: '🏋️', Workout: '💪', Crossfit: '💪', HighIntensityIntervalTraining: '🔥', Run: '🏃', TrailRun: '🏃', VirtualRun: '🏃', Walk: '🚶', Hike: '🥾', Ride: '🚴', VirtualRide: '🚴', Swim: '🏊', Yoga: '🧘', Rowing: '🚣', Elliptical: '🌀', StairStepper: '🪜' };
+    function fmtDur(s) { const m = Math.round(s / 60); const h = Math.floor(m / 60); return h > 0 ? h + 'h ' + String(m % 60).padStart(2, '0') + 'm' : m + 'm'; }
+    function fmtDate(iso) {
+      const d = new Date(iso), now = new Date();
+      const days = Math.floor((new Date(now.toDateString()) - new Date(d.toDateString())) / 864e5);
+      if (days === 0) return 'Today';
+      if (days === 1) return 'Yesterday';
+      if (days < 7) return d.toLocaleDateString(undefined, { weekday: 'short' });
+      return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+    }
+    function startOfWeek() { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d; }
+
+    function renderList(acts) {
+      const list = $('svList');
+      if (!acts.length) { list.innerHTML = '<li class="sv-empty">No activities yet — finish a workout in Lyfta and it\'ll land here.</li>'; return; }
+      list.innerHTML = acts.map((a) => {
+        const bits = [fmtDate(a.start_date_local), fmtDur(a.moving_time || a.elapsed_time || 0)];
+        if (a.distance > 50) bits.push((a.distance / 1000).toFixed(2) + ' km');
+        if (a.average_heartrate) bits.push(Math.round(a.average_heartrate) + ' bpm');
+        return '<li class="sv-item" data-id="' + esc(a.id) + '">'
+          + '<button class="sv-row" type="button"><span class="sv-ico">' + (ICONS[a.sport_type] || ICONS[a.type] || '⚡') + '</span>'
+          + '<span class="sv-main"><div class="sv-name">' + esc(a.name) + '</div><div class="sv-meta">' + esc(bits.join(' · ')) + '</div></span>'
+          + '<span class="sv-arrow">▾</span></button>'
+          + '<div class="sv-detail">Loading…</div></li>';
+      }).join('');
+      list.querySelectorAll('.sv-item').forEach((li) => {
+        li.querySelector('.sv-row').addEventListener('click', () => {
+          li.classList.toggle('open');
+          if (li.classList.contains('open') && !li.dataset.loaded) loadDetail(li);
+        });
+      });
+    }
+    // The list endpoint has no description; Lyfta writes the exercise
+    // breakdown there, so fetch the full activity when a row is opened.
+    async function loadDetail(li) {
+      const box = li.querySelector('.sv-detail');
+      try {
+        const a = await svFetch('/activities/' + li.dataset.id);
+        li.dataset.loaded = '1';
+        const chips = [];
+        if (a.calories) chips.push(Math.round(a.calories) + ' kcal');
+        if (a.average_heartrate) chips.push('avg ' + Math.round(a.average_heartrate) + ' bpm');
+        if (a.max_heartrate) chips.push('max ' + Math.round(a.max_heartrate) + ' bpm');
+        if (a.suffer_score) chips.push('effort ' + a.suffer_score);
+        if (a.device_name) chips.push(a.device_name);
+        box.innerHTML = (a.description ? '<div class="sv-desc">' + esc(a.description) + '</div>' : '')
+          + (chips.length ? '<div class="sv-chips">' + chips.map((c) => '<span class="sv-chip">' + esc(c) + '</span>').join('') + '</div>' : '')
+          + '<div style="margin-top:10px"><a class="sv-link" href="https://www.strava.com/activities/' + esc(a.id) + '" target="_blank" rel="noopener">View on Strava →</a></div>';
+      } catch (e) {
+        box.textContent = e.message || String(e);
+      }
+    }
+
+    async function loadData() {
+      if (!load()) return;
+      showErr('');
+      try {
+        const acts = await svFetch('/athlete/activities?per_page=30');
+        const wk = startOfWeek();
+        const week = acts.filter((a) => new Date(a.start_date_local) >= wk);
+        const secs = week.reduce((s, a) => s + (a.moving_time || 0), 0);
+        const hrs = week.filter((a) => a.average_heartrate);
+        $('svWkCount').textContent = String(week.length);
+        $('svWkTime').textContent = secs ? fmtDur(secs) : '0m';
+        $('svWkHr').textContent = hrs.length ? String(Math.round(hrs.reduce((s, a) => s + a.average_heartrate, 0) / hrs.length)) : '—';
+        renderList(acts.slice(0, 10));
+        $('svUpdated').textContent = 'Updated ' + new Date().toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+      } catch (e) {
+        showErr(e.message || String(e));
+        $('svList').innerHTML = '';
+      }
+    }
+    function render() {
+      const t = load();
+      if (t && t.access) {
+        $('svDisc').style.display = 'none'; $('svConn').style.display = '';
+        $('svWho').textContent = t.name ? '· ' + t.name : '';
+        loadData();
+      } else {
+        $('svDisc').style.display = ''; $('svConn').style.display = 'none';
+      }
+    }
+    render();
+  })();
+  </script>
 </div>
 
 <!-- Add / Edit Exercise Modal -->
