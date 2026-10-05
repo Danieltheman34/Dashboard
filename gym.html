@@ -1509,14 +1509,24 @@ img, video, canvas, svg { max-width: 100%; }
     const CACHE_KEY = 'lyfta_cache_v1';
     const COACH_KEY = 'po_coach_v1';
     const DAYS_BACK = 90;
+    // Lyfta's API doesn't say which unit weights are in; this account logs in lb.
+    const LYFTA_UNIT = 'lb';
+    // Bump when the import logic changes: previously imported Lyfta logs are
+    // removed and re-imported with the new rules.
+    const IMPORT_VER = 2;
     const $ = (id) => document.getElementById(id);
     const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
     const readLS = (k, f) => { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? f : v; } catch { return f; } };
 
     let workouts = (readLS(CACHE_KEY, {}).workouts) || [];
-    let mapRange = 'last', selMuscle = null, histOpen = false, lastSync = 0;
+    let mapRange = 'last', selMuscle = null, histOpen = false, exOpen = false, lastSync = 0;
 
-    function unit() { return (readLS(COACH_KEY, {}) || {}).units || 'kg'; }
+    function unit() { return LYFTA_UNIT; }
+    function toUnit(w, target) {
+      if (target === LYFTA_UNIT || !w) return w;
+      const v = target === 'kg' ? w * 0.45359237 : w / 0.45359237;
+      return Math.round(v * 2) / 2;
+    }
     function num(v) { const n = parseFloat(v); return isFinite(n) ? n : 0; }
     function e1rm(w, r) { return r < 2 ? w : w * (1 + r / 30); }
     function dayKey(d) { const x = new Date(d); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); }
@@ -1546,21 +1556,21 @@ img, video, canvas, svg { max-width: 100%; }
       [/deadlift/, ['glutes', 'hamstrings', 'lower_back'], ['quads', 'traps', 'forearms']],
       [/hip thrust|glute|bridge|abduct/, ['glutes'], ['hamstrings']],
       [/adduct/, ['adductors'], []],
-      [/squat|leg press|lunge|step.?up|hack|pistol/, ['quads', 'glutes'], ['adductors', 'hamstrings']],
+      [/squat|leg.*press|sled|lunge|step.?up|hack|pistol/, ['quads', 'glutes'], ['adductors', 'hamstrings']],
+      [/pull.?up|chin.?up|pulldown|pull.?down|pullover|\blat\b|straight.?arm/, ['lats'], ['biceps', 'rear_delts']],
       [/tricep|skull|pushdown|push.?down|close.?grip|\bdips?\b|french press/, ['triceps'], ['chest', 'front_delts']],
       [/back extension|hyperextension|superman/, ['lower_back'], ['glutes', 'hamstrings']],
-      [/rear delt|reverse fl|face pull/, ['rear_delts'], ['upper_back', 'traps']],
+      [/\brear\b|reverse fl|face pull/, ['rear_delts'], ['upper_back', 'traps']],
       [/shrug/, ['traps'], []],
       [/lateral raise|side raise|upright row|y.?raise/, ['side_delts'], ['traps']],
       [/front raise/, ['front_delts'], []],
       [/overhead press|shoulder|military|arnold|\bohp\b|push press/, ['front_delts', 'side_delts'], ['triceps', 'traps']],
       [/bench|chest|push.?up|\bfly|flye|pec|crossover|press/, ['chest'], ['front_delts', 'triceps']],
-      [/pull.?up|chin.?up|pulldown|pull.?down|pullover|\blat\b/, ['lats'], ['biceps', 'rear_delts']],
       [/\brow/, ['upper_back', 'lats'], ['biceps', 'rear_delts']],
+      [/wrist|forearm|farmer|finger curl|reverse.*curl/, ['forearms'], ['biceps']],
       [/curl/, ['biceps'], ['forearms']],
-      [/wrist|forearm|farmer|grip/, ['forearms'], ['traps']],
-      [/oblique|twist|side plank|wood.?chop|side bend/, ['obliques'], ['abs']],
-      [/crunch|sit.?up|plank|leg raise|knee raise|ab wheel|rollout|hollow|v.?up|\babs?\b|toes to bar|dead bug/, ['abs'], ['obliques']],
+      [/oblique|twist|side plank|wood.?chop|side bend|heel touch|elbow.?to.?knee|bicycle/, ['obliques'], ['abs']],
+      [/crunch|sit.?up|plank|leg raise|knee raise|ab wheel|rollout|hollow|v.?up|\babs?\b|toes to bar|dead bug|scissor|flutter/, ['abs'], ['obliques']],
     ];
     const MUSCLE_NAMES = { chest: 'Chest', front_delts: 'Front delts', side_delts: 'Side delts', rear_delts: 'Rear delts', biceps: 'Biceps', triceps: 'Triceps', forearms: 'Forearms', abs: 'Abs', obliques: 'Obliques', traps: 'Traps', upper_back: 'Upper back', lats: 'Lats', lower_back: 'Lower back', glutes: 'Glutes', quads: 'Quads', hamstrings: 'Hamstrings', adductors: 'Adductors', calves: 'Calves' };
     const MAJOR = ['chest', 'lats', 'upper_back', 'front_delts', 'side_delts', 'biceps', 'triceps', 'quads', 'hamstrings', 'glutes', 'calves', 'abs'];
@@ -1573,7 +1583,9 @@ img, video, canvas, svg { max-width: 100%; }
     }
 
     // ---------- Workout helpers ----------
-    function doneSets(ex) { return (ex.sets || []).filter((s) => s.is_completed !== false && (num(s.reps) > 0 || num(s.duration) > 0)); }
+    // Lyfta leaves is_completed false unless each set is ticked off, so any set
+    // with reps or a time counts as done.
+    function doneSets(ex) { return (ex.sets || []).filter((s) => num(s.reps) > 0 || num(s.duration) > 0); }
     function wDate(w) { return new Date(w.workout_perform_date); }
     function wVolume(w) {
       if (w.total_volume) return num(w.total_volume);
@@ -1769,7 +1781,9 @@ img, video, canvas, svg { max-width: 100%; }
         + stat(fmtVol(wVolume(w)), 'Volume ' + u)
         + stat(wSets(w), 'Sets')
         + stat(a && a.average_heartrate ? Math.round(a.average_heartrate) : '—', 'Avg HR');
-      $('trLastList').innerHTML = (w.exercises || []).map((ex) => {
+      const exs = (w.exercises || []).filter((ex) => doneSets(ex).length);
+      const shown = exOpen ? exs : exs.slice(0, 6);
+      $('trLastList').innerHTML = shown.map((ex) => {
         const sets = doneSets(ex);
         if (!sets.length) return '';
         const top = sets.reduce((b, s) => (e1rm(num(s.weight), num(s.reps)) > e1rm(num(b.weight), num(b.reps)) ? s : b), sets[0]);
@@ -1787,7 +1801,10 @@ img, video, canvas, svg { max-width: 100%; }
               const label = num(s.weight) ? fmtW(num(s.weight)) + '×' + num(s.reps) : num(s.reps) ? num(s.reps) + ' reps' : num(s.duration) + 's';
               return '<span class="tr-set' + (s === top ? ' top' : '') + '">' + label + '</span>';
             }).join('') + '</div></div>';
-      }).join('');
+      }).join('')
+        + (exs.length > 6 ? '<button class="tr-more" type="button" id="trExMore">' + (exOpen ? 'Show fewer' : 'Show all ' + exs.length + ' exercises') + '</button>' : '');
+      const exMore = $('trExMore');
+      if (exMore) exMore.onclick = () => { exOpen = !exOpen; renderWorkout(w); };
     }
     function stat(v, l) { return '<div class="tr-stat"><div class="tr-stat-val">' + esc(v) + '</div><div class="tr-stat-label">' + esc(l) + '</div></div>'; }
     function renderLast() {
@@ -1822,7 +1839,10 @@ img, video, canvas, svg { max-width: 100%; }
         const top = sets.reduce((b, s) => (num(s.weight) > num(b.weight) ? s : b), sets[0]);
         (byEx[ex.excercise_name] = byEx[ex.excercise_name] || []).push({ d: wDate(w), v: best, top });
       }));
-      const lifts = Object.entries(byEx).sort((a, b) => b[1].length - a[1].length || b[1][b[1].length - 1].v - a[1][a[1].length - 1].v).slice(0, 8);
+      // Big compound lifts first, then whatever you do most often.
+      const BIG = /chest|quads|lats|upper_back|hamstrings|glutes|front_delts/;
+      const rank = ([name, pts]) => pts.length + (BIG.test(musclesFor(name).p.join(' ')) ? 100 : 0);
+      const lifts = Object.entries(byEx).sort((a, b) => rank(b) - rank(a) || b[1][b[1].length - 1].v - a[1][a[1].length - 1].v).slice(0, 8);
       if (!lifts.length) { $('trLifts').className = 'tr-msg'; $('trLifts').textContent = 'Your weighted lifts will chart here once Lyfta has a few sessions.'; return; }
       const u = unit();
       $('trLifts').className = '';
@@ -1863,6 +1883,13 @@ img, video, canvas, svg { max-width: 100%; }
       if (!raw) return -1; // coach state not saved yet (e.g. still pulling from the cloud)
       let st; try { st = JSON.parse(raw); } catch { return 0; }
       if (!Array.isArray(st.exercises) || !st.logs || !Array.isArray(st.days) || !st.days.length) return 0;
+      let migrated = false;
+      if (st.lyftaImportVer !== IMPORT_VER) {
+        Object.keys(st.logs).forEach((id) => { st.logs[id] = (st.logs[id] || []).filter((l) => l.src !== 'lyfta'); });
+        st.lyftaImportVer = IMPORT_VER;
+        migrated = true;
+      }
+      const coachUnit = st.units || 'kg';
       const seen = new Set();
       Object.values(st.logs).forEach((arr) => (arr || []).forEach((l) => { if (l.lid) seen.add(l.lid); }));
       let added = 0;
@@ -1877,15 +1904,15 @@ img, video, canvas, svg { max-width: 100%; }
           if (!target) {
             const bw = sets.every((x) => !num(x.weight));
             target = { id: 'lyfta_' + ex.exercise_id + '_' + Date.now(), name: ex.excercise_name, gym: 'both', day: guessDay(st, w, ex.excercise_name),
-              repMin: 6, repMax: 10, step: 2.5, startWeight: num(s.weight), bw, lyftaId: ex.exercise_id };
+              repMin: 6, repMax: 10, step: coachUnit === 'lb' ? 5 : 2.5, startWeight: toUnit(num(s.weight), coachUnit), bw, lyftaId: ex.exercise_id };
             st.exercises.push(target);
           } else if (target.lyftaId == null) target.lyftaId = ex.exercise_id;
-          (st.logs[target.id] = st.logs[target.id] || []).push({ weight: num(s.weight), reps: num(s.reps), date: w.workout_perform_date, lid, src: 'lyfta' });
+          (st.logs[target.id] = st.logs[target.id] || []).push({ weight: toUnit(num(s.weight), coachUnit), reps: num(s.reps), date: w.workout_perform_date, lid, src: 'lyfta' });
           seen.add(lid); added++;
         });
         if (target && st.logs[target.id]) st.logs[target.id].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
       }));
-      if (added) {
+      if (added || migrated) {
         try { localStorage.setItem(COACH_KEY, JSON.stringify(st)); } catch { return 0; }
         if (typeof window.poReload === 'function') window.poReload();
       }
