@@ -1276,6 +1276,678 @@ img, video, canvas, svg { max-width: 100%; }
     <span class="po-day-split" id="dayPillSplit">—</span>
   </button>
 
+  <!-- TRAINING — Lyfta workouts (via /api/lyfta) + WHOOP recovery +
+       Strava duration/HR, with a muscle map. New Lyfta sets are also
+       imported into the coach's logs (po_coach_v1) further down. -->
+  <style>
+    .tr-section { margin-bottom: 22px; }
+    .tr-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 18px; padding: 18px; margin-bottom: 12px; }
+    .tr-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-3); }
+    .tr-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 14px; }
+    .tr-title { font-size: 18px; font-weight: 700; letter-spacing: -0.02em; margin-top: 4px; }
+    .tr-sub { font-size: 12px; color: var(--text-3); margin-top: 3px; }
+    .tr-status { font-size: 11px; color: var(--text-3); font-family: var(--font-mono); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+    .tr-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--good); box-shadow: 0 0 8px rgba(110,231,183,0.6); }
+    .tr-dot.off { background: var(--text-4); box-shadow: none; }
+    .tr-msg { font-size: 13px; color: var(--text-2); line-height: 1.55; }
+    .tr-msg a { color: var(--text-1); }
+    .tr-err { background: rgba(255,107,107,0.08); border: 1px solid rgba(255,107,107,0.28); color: var(--bad); padding: 10px 12px; border-radius: 10px; font-size: 12px; margin-bottom: 12px; word-break: break-word; }
+
+    /* Recovery */
+    .tr-rec { display: grid; grid-template-columns: 96px 1fr; gap: 16px; align-items: center; }
+    .tr-ring { position: relative; width: 96px; height: 96px; }
+    .tr-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+    .tr-ring-track { fill: none; stroke: rgba(255,255,255,0.07); stroke-width: 9; }
+    .tr-ring-fill { fill: none; stroke-width: 9; stroke-linecap: round; transition: stroke-dashoffset 0.8s cubic-bezier(0.22,1,0.36,1); }
+    .tr-ring-num { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 26px; font-weight: 700; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+    .tr-ring-num small { font-size: 9px; letter-spacing: 0.16em; color: var(--text-3); font-weight: 700; margin-top: 2px; }
+    .tr-call { font-size: 14px; font-weight: 600; line-height: 1.4; margin-bottom: 10px; }
+    .tr-minis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+    .tr-mini { background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 10px; padding: 7px 4px; text-align: center; }
+    .tr-mini b { display: block; font-size: 15px; font-variant-numeric: tabular-nums; }
+    .tr-mini span { font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-3); font-weight: 700; }
+    .tr-load { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 12px; color: var(--text-2); line-height: 1.5; }
+
+    /* Stats row */
+    .tr-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .tr-stat { background: rgba(255,255,255,0.025); border: 1px solid var(--border); border-radius: 12px; padding: 11px 6px; text-align: center; }
+    .tr-stat-val { font-size: 19px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -0.03em; }
+    .tr-stat-label { font-size: 9.5px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.12em; font-weight: 700; margin-top: 6px; }
+    @media (max-width: 420px) { .tr-stats { grid-template-columns: repeat(2, 1fr); } .tr-minis { grid-template-columns: repeat(2, 1fr); } }
+
+    /* Week strip */
+    .tr-strip { display: grid; grid-template-columns: repeat(14, 1fr); gap: 4px; margin-top: 14px; }
+    .tr-day { aspect-ratio: 1; border-radius: 6px; background: rgba(255,255,255,0.04); position: relative; }
+    .tr-day.lift { background: rgba(255,107,53,0.75); }
+    .tr-day.cardio { background: rgba(110,231,183,0.45); }
+    .tr-day.lift.cardio { background: linear-gradient(135deg, rgba(255,107,53,0.8) 50%, rgba(110,231,183,0.55) 50%); }
+    .tr-day.today { outline: 1px solid rgba(255,255,255,0.5); outline-offset: 1px; }
+    .tr-strip-legend { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-3); margin-top: 6px; font-family: var(--font-mono); }
+    .tr-strip-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin: 0 4px 0 10px; vertical-align: -1px; }
+
+    /* Body map */
+    .tr-seg { display: inline-flex; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 999px; padding: 2px; }
+    .tr-seg button { border: 0; background: none; color: var(--text-3); font-family: inherit; font-size: 11.5px; font-weight: 600; padding: 5px 10px; border-radius: 999px; cursor: pointer; }
+    .tr-seg button.on { background: rgba(255,255,255,0.10); color: var(--text-1); }
+    .tr-body { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; max-width: 360px; margin: 4px auto 0; }
+    .tr-body figure { margin: 0; text-align: center; }
+    .tr-body svg { width: 100%; height: auto; display: block; }
+    .tr-body figcaption { font-size: 9.5px; letter-spacing: 0.18em; color: var(--text-4); font-weight: 700; margin-top: 4px; }
+    .tr-body .m { fill: #1e1e24; stroke: rgba(255,255,255,0.07); stroke-width: 0.6; cursor: pointer; transition: fill 0.4s; }
+    .tr-body .m.sel { stroke: #fff; stroke-width: 1.2; }
+    .tr-body .n { fill: #16161b; stroke: rgba(255,255,255,0.05); stroke-width: 0.6; }
+    .tr-scale { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 10px; color: var(--text-3); margin-top: 10px; }
+    .tr-scale-bar { width: 110px; height: 6px; border-radius: 999px; background: linear-gradient(90deg, #1e1e24, rgba(255,107,53,0.45), #ff6b35); }
+    .tr-musc { margin-top: 14px; display: grid; gap: 7px; }
+    .tr-musc-row { display: grid; grid-template-columns: 92px 1fr 44px; align-items: center; gap: 10px; font-size: 12px; }
+    .tr-musc-row span:first-child { color: var(--text-2); }
+    .tr-musc-bar { height: 6px; background: rgba(255,255,255,0.05); border-radius: 999px; overflow: hidden; }
+    .tr-musc-bar i { display: block; height: 100%; background: #ff6b35; border-radius: 999px; }
+    .tr-musc-row b { text-align: right; font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--text-2); }
+    .tr-gap { margin-top: 12px; font-size: 12px; color: var(--text-3); line-height: 1.5; }
+    .tr-gap b { color: var(--warn); font-weight: 600; }
+
+    /* Last workout */
+    .tr-ex { border-top: 1px solid var(--border); padding: 11px 0; }
+    .tr-ex-top { display: flex; align-items: center; gap: 10px; }
+    .tr-ex-img { width: 36px; height: 36px; border-radius: 9px; background: #fff; object-fit: contain; flex-shrink: 0; }
+    .tr-ex-name { font-size: 14px; font-weight: 600; flex: 1; min-width: 0; }
+    .tr-ex-meta { font-size: 11px; color: var(--text-3); font-family: var(--font-mono); margin-top: 2px; }
+    .tr-pr { font-size: 9.5px; font-weight: 800; letter-spacing: 0.12em; color: #F2C063; background: rgba(242,192,99,0.10); border: 1px solid rgba(242,192,99,0.4); border-radius: 999px; padding: 2px 7px; flex-shrink: 0; }
+    .tr-sets { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; padding-left: 46px; }
+    .tr-set { font-size: 11.5px; font-family: var(--font-mono); padding: 3px 8px; border-radius: 7px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); color: var(--text-2); }
+    .tr-set.top { color: var(--text-1); border-color: rgba(255,107,53,0.45); }
+    .tr-more { display: block; width: 100%; margin-top: 8px; padding: 9px; background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 10px; color: var(--text-2); font-family: inherit; font-size: 12px; cursor: pointer; }
+    .tr-hist-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--border); cursor: pointer; }
+    .tr-hist-row div:first-child { min-width: 0; }
+    .tr-hist-name { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tr-hist-meta { font-size: 11px; color: var(--text-3); font-family: var(--font-mono); margin-top: 2px; }
+    .tr-hist-vol { font-size: 12px; font-family: var(--font-mono); color: var(--text-2); white-space: nowrap; }
+
+    /* Lifts */
+    .tr-lift { display: grid; grid-template-columns: 1fr 84px 64px; gap: 10px; align-items: center; padding: 10px 0; border-top: 1px solid var(--border); }
+    .tr-lift-name { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tr-lift-meta { font-size: 11px; color: var(--text-3); font-family: var(--font-mono); margin-top: 2px; }
+    .tr-lift svg { width: 84px; height: 28px; display: block; }
+    .tr-lift-1rm { text-align: right; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .tr-lift-1rm small { display: block; font-size: 10.5px; font-weight: 600; font-family: var(--font-mono); margin-top: 2px; }
+    .up { color: var(--good); } .down { color: var(--bad); } .flat { color: var(--text-3); }
+  </style>
+
+  <div class="tr-section" id="trRoot">
+    <div class="wt-divider"><span>TRAINING</span></div>
+
+    <!-- Recovery -->
+    <div class="tr-card" id="trRecCard">
+      <div class="tr-head">
+        <div><div class="tr-eyebrow">Recovery</div><div class="tr-title">Ready to train?</div></div>
+        <span class="tr-status" id="trRecStatus"></span>
+      </div>
+      <div id="trRecBody" class="tr-msg">Loading…</div>
+    </div>
+
+    <!-- Overview -->
+    <div class="tr-card">
+      <div class="tr-head">
+        <div><div class="tr-eyebrow">This week</div><div class="tr-title" id="trWeekTitle">—</div></div>
+        <span class="tr-status" id="trSync"><span class="tr-dot off"></span>—</span>
+      </div>
+      <div id="trSetup"></div>
+      <div class="tr-stats">
+        <div class="tr-stat"><div class="tr-stat-val" id="trWkWorkouts">—</div><div class="tr-stat-label">Workouts</div></div>
+        <div class="tr-stat"><div class="tr-stat-val" id="trWkSets">—</div><div class="tr-stat-label">Sets</div></div>
+        <div class="tr-stat"><div class="tr-stat-val" id="trWkVol">—</div><div class="tr-stat-label">Volume</div></div>
+        <div class="tr-stat"><div class="tr-stat-val" id="trWkTime">—</div><div class="tr-stat-label">Time</div></div>
+      </div>
+      <div class="tr-strip" id="trStrip"></div>
+      <div class="tr-strip-legend"><span>2 weeks ago</span><span><i style="background:rgba(255,107,53,0.75)"></i>Lift<i style="background:rgba(110,231,183,0.45)"></i>Cardio</span><span>Today</span></div>
+    </div>
+
+    <!-- Muscle map -->
+    <div class="tr-card">
+      <div class="tr-head">
+        <div><div class="tr-eyebrow">Muscles worked</div><div class="tr-sub" id="trMapSub">—</div></div>
+        <div class="tr-seg" id="trMapSeg">
+          <button type="button" data-r="last" class="on">Last</button>
+          <button type="button" data-r="7">7 days</button>
+          <button type="button" data-r="30">30 days</button>
+        </div>
+      </div>
+      <div class="tr-body">
+        <figure>
+          <svg viewBox="0 0 120 232" aria-label="Front muscles">
+            <circle class="n" cx="60" cy="16" r="11"/>
+            <rect class="n" x="54" y="26" width="12" height="9" rx="3"/>
+            <ellipse class="m" data-m="front_delts" cx="40" cy="45" rx="8.5" ry="7.5"/>
+            <ellipse class="m" data-m="front_delts" cx="80" cy="45" rx="8.5" ry="7.5"/>
+            <ellipse class="m" data-m="side_delts" cx="33" cy="49" rx="4" ry="7"/>
+            <ellipse class="m" data-m="side_delts" cx="87" cy="49" rx="4" ry="7"/>
+            <path class="m" data-m="chest" d="M59,39 L45,40 Q38,44 40,54 Q46,62 59,58 Z"/>
+            <path class="m" data-m="chest" d="M61,39 L75,40 Q82,44 80,54 Q74,62 61,58 Z"/>
+            <ellipse class="m" data-m="biceps" cx="33" cy="66" rx="5.5" ry="11"/>
+            <ellipse class="m" data-m="biceps" cx="87" cy="66" rx="5.5" ry="11"/>
+            <ellipse class="m" data-m="forearms" cx="29" cy="91" rx="4.5" ry="12" transform="rotate(8 29 91)"/>
+            <ellipse class="m" data-m="forearms" cx="91" cy="91" rx="4.5" ry="12" transform="rotate(-8 91 91)"/>
+            <circle class="n" cx="26" cy="108" r="4"/>
+            <circle class="n" cx="94" cy="108" r="4"/>
+            <rect class="m" data-m="abs" x="52.5" y="61" width="15" height="38" rx="4"/>
+            <path class="m" data-m="obliques" d="M51,62 L43,60 Q40,78 44,97 L51,99 Z"/>
+            <path class="m" data-m="obliques" d="M69,62 L77,60 Q80,78 76,97 L69,99 Z"/>
+            <path class="n" d="M44,100 L76,100 L71,114 L49,114 Z"/>
+            <ellipse class="m" data-m="quads" cx="50" cy="138" rx="9" ry="23"/>
+            <ellipse class="m" data-m="quads" cx="70" cy="138" rx="9" ry="23"/>
+            <ellipse class="m" data-m="adductors" cx="57.5" cy="124" rx="2.6" ry="11"/>
+            <ellipse class="m" data-m="adductors" cx="62.5" cy="124" rx="2.6" ry="11"/>
+            <circle class="n" cx="50" cy="165" r="5"/>
+            <circle class="n" cx="70" cy="165" r="5"/>
+            <ellipse class="m" data-m="calves" cx="49" cy="189" rx="5.5" ry="16"/>
+            <ellipse class="m" data-m="calves" cx="71" cy="189" rx="5.5" ry="16"/>
+            <ellipse class="n" cx="48" cy="211" rx="6" ry="3"/>
+            <ellipse class="n" cx="72" cy="211" rx="6" ry="3"/>
+          </svg>
+          <figcaption>FRONT</figcaption>
+        </figure>
+        <figure>
+          <svg viewBox="0 0 120 232" aria-label="Back muscles">
+            <circle class="n" cx="60" cy="16" r="11"/>
+            <path class="m" data-m="upper_back" d="M50,46 L70,46 L67,66 L53,66 Z"/>
+            <path class="m" data-m="traps" d="M60,27 L47,40 L54,46 L60,64 L66,46 L73,40 Z"/>
+            <ellipse class="m" data-m="rear_delts" cx="40" cy="45" rx="8.5" ry="7.5"/>
+            <ellipse class="m" data-m="rear_delts" cx="80" cy="45" rx="8.5" ry="7.5"/>
+            <ellipse class="m" data-m="side_delts" cx="33" cy="49" rx="4" ry="7"/>
+            <ellipse class="m" data-m="side_delts" cx="87" cy="49" rx="4" ry="7"/>
+            <path class="m" data-m="lats" d="M51,54 L44,52 Q39,70 47,90 L57,84 L57,68 Z"/>
+            <path class="m" data-m="lats" d="M69,54 L76,52 Q81,70 73,90 L63,84 L63,68 Z"/>
+            <ellipse class="m" data-m="triceps" cx="33" cy="66" rx="5.5" ry="11"/>
+            <ellipse class="m" data-m="triceps" cx="87" cy="66" rx="5.5" ry="11"/>
+            <ellipse class="m" data-m="forearms" cx="29" cy="91" rx="4.5" ry="12" transform="rotate(8 29 91)"/>
+            <ellipse class="m" data-m="forearms" cx="91" cy="91" rx="4.5" ry="12" transform="rotate(-8 91 91)"/>
+            <circle class="n" cx="26" cy="108" r="4"/>
+            <circle class="n" cx="94" cy="108" r="4"/>
+            <rect class="m" data-m="lower_back" x="52" y="84" width="16" height="17" rx="4"/>
+            <ellipse class="m" data-m="glutes" cx="51" cy="112" rx="9.5" ry="10"/>
+            <ellipse class="m" data-m="glutes" cx="69" cy="112" rx="9.5" ry="10"/>
+            <ellipse class="m" data-m="hamstrings" cx="50" cy="143" rx="8.5" ry="20"/>
+            <ellipse class="m" data-m="hamstrings" cx="70" cy="143" rx="8.5" ry="20"/>
+            <circle class="n" cx="50" cy="166" r="4.5"/>
+            <circle class="n" cx="70" cy="166" r="4.5"/>
+            <ellipse class="m" data-m="calves" cx="49" cy="187" rx="7" ry="16"/>
+            <ellipse class="m" data-m="calves" cx="71" cy="187" rx="7" ry="16"/>
+            <ellipse class="n" cx="48" cy="211" rx="6" ry="3"/>
+            <ellipse class="n" cx="72" cy="211" rx="6" ry="3"/>
+          </svg>
+          <figcaption>BACK</figcaption>
+        </figure>
+      </div>
+      <div class="tr-scale"><span>Less</span><span class="tr-scale-bar"></span><span>More sets</span></div>
+      <div class="tr-musc" id="trMusc"></div>
+      <div class="tr-gap" id="trGap"></div>
+    </div>
+
+    <!-- Last workout -->
+    <div class="tr-card">
+      <div class="tr-head">
+        <div style="min-width:0"><div class="tr-eyebrow">Last workout</div><div class="tr-title" id="trLastTitle">—</div><div class="tr-sub" id="trLastSub"></div></div>
+      </div>
+      <div class="tr-stats" id="trLastStats"></div>
+      <div id="trLastList" style="margin-top:12px"></div>
+      <div id="trHist"></div>
+    </div>
+
+    <!-- Lifts -->
+    <div class="tr-card">
+      <div class="tr-head">
+        <div><div class="tr-eyebrow">Lift progress</div><div class="tr-sub">Estimated 1-rep max · last 90 days</div></div>
+      </div>
+      <div id="trLifts" class="tr-msg">—</div>
+    </div>
+  </div>
+
+  <script>
+  (function () {
+    'use strict';
+    const CACHE_KEY = 'lyfta_cache_v1';
+    const COACH_KEY = 'po_coach_v1';
+    const DAYS_BACK = 90;
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+    const readLS = (k, f) => { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? f : v; } catch { return f; } };
+
+    let workouts = (readLS(CACHE_KEY, {}).workouts) || [];
+    let mapRange = 'last', selMuscle = null, histOpen = false, lastSync = 0;
+
+    function unit() { return (readLS(COACH_KEY, {}) || {}).units || 'kg'; }
+    function num(v) { const n = parseFloat(v); return isFinite(n) ? n : 0; }
+    function e1rm(w, r) { return r < 2 ? w : w * (1 + r / 30); }
+    function dayKey(d) { const x = new Date(d); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); }
+    function daysAgo(n) { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - n); return d; }
+    function startOfWeek() { const d = daysAgo(0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d; }
+    function fmtDur(s) { const m = Math.round(s / 60); const h = Math.floor(m / 60); return h > 0 ? h + 'h ' + String(m % 60).padStart(2, '0') + 'm' : m + 'm'; }
+    function fmtVol(v) { return v >= 10000 ? (v / 1000).toFixed(1) + 'k' : String(Math.round(v)); }
+    function fmtW(w) { return (Math.round(w * 10) / 10).toString(); }
+    function relDate(iso) {
+      const d = new Date(iso);
+      const days = Math.round((daysAgo(0) - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 864e5);
+      const t = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+      if (days === 0) return 'Today · ' + t;
+      if (days === 1) return 'Yesterday · ' + t;
+      if (days < 7) return d.toLocaleDateString(undefined, { weekday: 'long' }) + ' · ' + t;
+      return d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+    }
+
+    // ---------- Exercise → muscles ----------
+    // Lyfta doesn't return muscle groups, so match on the exercise name.
+    // First matching rule wins; [primary, secondary].
+    const RULES = [
+      [/leg extension/, ['quads'], []],
+      [/leg curl|hamstring curl|nordic/, ['hamstrings'], []],
+      [/calf|calves/, ['calves'], []],
+      [/romanian|\brdl\b|stiff.?leg|good morning/, ['hamstrings', 'glutes'], ['lower_back']],
+      [/deadlift/, ['glutes', 'hamstrings', 'lower_back'], ['quads', 'traps', 'forearms']],
+      [/hip thrust|glute|bridge|abduct/, ['glutes'], ['hamstrings']],
+      [/adduct/, ['adductors'], []],
+      [/squat|leg press|lunge|step.?up|hack|pistol/, ['quads', 'glutes'], ['adductors', 'hamstrings']],
+      [/tricep|skull|pushdown|push.?down|close.?grip|\bdips?\b|french press/, ['triceps'], ['chest', 'front_delts']],
+      [/back extension|hyperextension|superman/, ['lower_back'], ['glutes', 'hamstrings']],
+      [/rear delt|reverse fl|face pull/, ['rear_delts'], ['upper_back', 'traps']],
+      [/shrug/, ['traps'], []],
+      [/lateral raise|side raise|upright row|y.?raise/, ['side_delts'], ['traps']],
+      [/front raise/, ['front_delts'], []],
+      [/overhead press|shoulder|military|arnold|\bohp\b|push press/, ['front_delts', 'side_delts'], ['triceps', 'traps']],
+      [/bench|chest|push.?up|\bfly|flye|pec|crossover|press/, ['chest'], ['front_delts', 'triceps']],
+      [/pull.?up|chin.?up|pulldown|pull.?down|pullover|\blat\b/, ['lats'], ['biceps', 'rear_delts']],
+      [/\brow/, ['upper_back', 'lats'], ['biceps', 'rear_delts']],
+      [/curl/, ['biceps'], ['forearms']],
+      [/wrist|forearm|farmer|grip/, ['forearms'], ['traps']],
+      [/oblique|twist|side plank|wood.?chop|side bend/, ['obliques'], ['abs']],
+      [/crunch|sit.?up|plank|leg raise|knee raise|ab wheel|rollout|hollow|v.?up|\babs?\b|toes to bar|dead bug/, ['abs'], ['obliques']],
+    ];
+    const MUSCLE_NAMES = { chest: 'Chest', front_delts: 'Front delts', side_delts: 'Side delts', rear_delts: 'Rear delts', biceps: 'Biceps', triceps: 'Triceps', forearms: 'Forearms', abs: 'Abs', obliques: 'Obliques', traps: 'Traps', upper_back: 'Upper back', lats: 'Lats', lower_back: 'Lower back', glutes: 'Glutes', quads: 'Quads', hamstrings: 'Hamstrings', adductors: 'Adductors', calves: 'Calves' };
+    const MAJOR = ['chest', 'lats', 'upper_back', 'front_delts', 'side_delts', 'biceps', 'triceps', 'quads', 'hamstrings', 'glutes', 'calves', 'abs'];
+    const muscleCache = {};
+    function musclesFor(name) {
+      const k = String(name || '').toLowerCase();
+      if (muscleCache[k]) return muscleCache[k];
+      const r = RULES.find((x) => x[0].test(k));
+      return (muscleCache[k] = r ? { p: r[1], s: r[2] } : { p: [], s: [] });
+    }
+
+    // ---------- Workout helpers ----------
+    function doneSets(ex) { return (ex.sets || []).filter((s) => s.is_completed !== false && (num(s.reps) > 0 || num(s.duration) > 0)); }
+    function wDate(w) { return new Date(w.workout_perform_date); }
+    function wVolume(w) {
+      if (w.total_volume) return num(w.total_volume);
+      return (w.exercises || []).reduce((t, ex) => t + doneSets(ex).reduce((a, s) => a + num(s.weight) * num(s.reps), 0), 0);
+    }
+    function wSets(w) { return (w.exercises || []).reduce((t, ex) => t + doneSets(ex).length, 0); }
+    function inRange(from) { return workouts.filter((w) => wDate(w) >= from); }
+    function stravaActs() { return window.svActivities || []; }
+    // Strava activity recorded around the same time as a Lyfta workout.
+    function stravaFor(w) {
+      const t = wDate(w).getTime();
+      let best = null, bestGap = 3 * 3600e3;
+      stravaActs().forEach((a) => {
+        if (!/WeightTraining|Workout|Crossfit/.test(a.sport_type || a.type)) return;
+        const s = new Date(a.start_date).getTime(), e = s + (a.elapsed_time || 0) * 1000;
+        const gap = t >= s && t <= e ? 0 : Math.min(Math.abs(t - s), Math.abs(t - e));
+        if (gap < bestGap) { best = a; bestGap = gap; }
+      });
+      return best;
+    }
+    function isLift(a) { return /WeightTraining|Workout|Crossfit/.test(a.sport_type || a.type); }
+
+    // ---------- Recovery (WHOOP) ----------
+    async function whoopFetch(path) {
+      let t = readLS('whoop_tokens_v1', null);
+      if (!t || !t.access) return null;
+      const call = (tok) => {
+        const [p, qs] = path.split('?');
+        const params = new URLSearchParams(qs || ''); params.set('path', p);
+        return fetch('/api/whoop-data?' + params, { headers: { Authorization: 'Bearer ' + tok.access } });
+      };
+      let r = await call(t);
+      if (r.status === 401 && t.refresh) {
+        const rr = await fetch('/api/whoop-refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: t.refresh }) });
+        const j = await rr.json().catch(() => ({}));
+        if (!j.access_token) return null;
+        t = { access: j.access_token, refresh: j.refresh_token || t.refresh, expires: Date.now() + (j.expires_in || 3500) * 1000 };
+        try { localStorage.setItem('whoop_tokens_v1', JSON.stringify(t)); } catch {}
+        r = await call(t);
+      }
+      return r.ok ? r.json() : null;
+    }
+    async function renderRecovery() {
+      const body = $('trRecBody');
+      if (!readLS('whoop_tokens_v1', null)) {
+        body.innerHTML = 'Connect WHOOP on the <a href="health.html">Health page</a> to see today\'s recovery here.';
+        $('trRecStatus').innerHTML = '';
+        renderLoadOnly();
+        return;
+      }
+      const [rec, cyc, slp] = await Promise.all([
+        whoopFetch('/recovery?limit=1').catch(() => null),
+        whoopFetch('/cycle?limit=1').catch(() => null),
+        whoopFetch('/activity/sleep?limit=1').catch(() => null),
+      ]);
+      const r0 = rec && rec.records && rec.records[0] && rec.records[0].score;
+      if (!r0) { body.textContent = 'No recovery score yet today — WHOOP calculates it after you wake up.'; renderLoadOnly(); return; }
+      const score = Math.round(r0.recovery_score || 0);
+      const col = score >= 67 ? '#6ee7b7' : score >= 34 ? '#fbbf24' : '#ff8a8a';
+      const call = score >= 67 ? 'Green light — go heavy and chase a PR today.'
+        : score >= 34 ? 'Train as planned, but skip max-effort sets.'
+        : 'Low recovery — keep it light: technique work, mobility or a walk.';
+      const c0 = cyc && cyc.records && cyc.records[0] && cyc.records[0].score;
+      const s0 = slp && slp.records && slp.records[0] && slp.records[0].score;
+      const C = 2 * Math.PI * 40;
+      body.className = '';
+      body.innerHTML = '<div class="tr-rec">'
+        + '<div class="tr-ring"><svg viewBox="0 0 96 96"><circle class="tr-ring-track" cx="48" cy="48" r="40"/>'
+        + '<circle class="tr-ring-fill" cx="48" cy="48" r="40" stroke="' + col + '" stroke-dasharray="' + C + '" stroke-dashoffset="' + (C * (1 - score / 100)) + '"/></svg>'
+        + '<div class="tr-ring-num">' + score + '<small>%</small></div></div>'
+        + '<div><div class="tr-call" style="color:' + col + '">' + call + '</div><div class="tr-minis">'
+        + mini(r0.hrv_rmssd_milli != null ? Math.round(r0.hrv_rmssd_milli) : '—', 'HRV')
+        + mini(r0.resting_heart_rate != null ? Math.round(r0.resting_heart_rate) : '—', 'RHR')
+        + mini(s0 && s0.sleep_performance_percentage != null ? Math.round(s0.sleep_performance_percentage) + '%' : '—', 'Sleep')
+        + mini(c0 && c0.strain != null ? Number(c0.strain).toFixed(1) : '—', 'Strain')
+        + '</div></div></div><div class="tr-load" id="trLoad"></div>';
+      $('trRecStatus').innerHTML = '<span class="tr-dot"></span>WHOOP';
+      renderLoad();
+    }
+    function mini(v, l) { return '<div class="tr-mini"><b>' + esc(v) + '</b><span>' + l + '</span></div>'; }
+    function renderLoadOnly() {
+      const body = $('trRecBody');
+      if (!$('trLoad')) body.insertAdjacentHTML('beforeend', '<div class="tr-load" id="trLoad"></div>');
+      renderLoad();
+    }
+    // Training load: sets in the last 7 days vs the average of the 3 weeks before.
+    function renderLoad() {
+      const el = $('trLoad'); if (!el) return;
+      if (!workouts.length) { el.textContent = ''; el.style.display = 'none'; return; }
+      el.style.display = '';
+      const now = 7, recent = inRange(daysAgo(now)).reduce((t, w) => t + wSets(w), 0);
+      const prior = workouts.filter((w) => wDate(w) >= daysAgo(28) && wDate(w) < daysAgo(7)).reduce((t, w) => t + wSets(w), 0) / 3;
+      if (!prior) { el.innerHTML = '<b>' + recent + '</b> working sets in the last 7 days.'; return; }
+      const pct = Math.round((recent / prior - 1) * 100);
+      const word = pct > 25 ? 'well above' : pct > 8 ? 'above' : pct < -25 ? 'well below' : pct < -8 ? 'below' : 'in line with';
+      el.innerHTML = 'Training load: <b>' + recent + ' sets</b> in the last 7 days — ' + word + ' your usual ' + Math.round(prior) + '/week'
+        + (pct > 25 ? '. Consider a lighter day if recovery is low.' : '.');
+    }
+
+    // ---------- Overview ----------
+    function renderOverview() {
+      const wk = inRange(startOfWeek());
+      const acts = stravaActs().filter((a) => new Date(a.start_date_local.replace('Z', '')) >= startOfWeek());
+      const secs = wk.reduce((t, w) => { const a = stravaFor(w); return t + (a ? a.moving_time || a.elapsed_time || 0 : 0); }, 0)
+        + acts.filter((a) => !isLift(a)).reduce((t, a) => t + (a.moving_time || 0), 0);
+      $('trWkWorkouts').textContent = String(wk.length + acts.filter((a) => !isLift(a)).length);
+      $('trWkSets').textContent = String(wk.reduce((t, w) => t + wSets(w), 0));
+      $('trWkVol').textContent = fmtVol(wk.reduce((t, w) => t + wVolume(w), 0));
+      $('trWkTime').textContent = secs ? fmtDur(secs) : '—';
+      const vol = wk.reduce((t, w) => t + wVolume(w), 0);
+      $('trWeekTitle').textContent = wk.length ? fmtVol(vol) + ' ' + unit() + ' lifted' : 'No lifts yet this week';
+      const liftDays = new Set(workouts.map((w) => dayKey(w.workout_perform_date)));
+      const cardioDays = new Set(stravaActs().filter((a) => !isLift(a)).map((a) => a.start_date_local.slice(0, 10)));
+      let html = '';
+      for (let i = 13; i >= 0; i--) {
+        const k = dayKey(daysAgo(i));
+        const cls = (liftDays.has(k) ? ' lift' : '') + (cardioDays.has(k) ? ' cardio' : '') + (i === 0 ? ' today' : '');
+        html += '<div class="tr-day' + cls + '" title="' + k + '"></div>';
+      }
+      $('trStrip').innerHTML = html;
+    }
+
+    // ---------- Muscle map ----------
+    function muscleScores() {
+      let list;
+      if (mapRange === 'last') list = workouts.length ? [workouts[0]] : [];
+      else list = inRange(daysAgo(Number(mapRange) - 1));
+      const sc = {};
+      list.forEach((w) => (w.exercises || []).forEach((ex) => {
+        const n = doneSets(ex).length; if (!n) return;
+        const m = musclesFor(ex.excercise_name);
+        m.p.forEach((k) => { sc[k] = (sc[k] || 0) + n; });
+        m.s.forEach((k) => { sc[k] = (sc[k] || 0) + n * 0.5; });
+      }));
+      return { sc, list };
+    }
+    function renderMap() {
+      const { sc, list } = muscleScores();
+      const max = Math.max(1, ...Object.values(sc));
+      document.querySelectorAll('#trRoot .tr-body .m').forEach((el) => {
+        const v = sc[el.dataset.m] || 0;
+        const t = v / max;
+        el.style.fill = v ? 'rgba(255,107,53,' + (0.22 + 0.78 * t).toFixed(2) + ')' : '';
+        el.classList.toggle('sel', el.dataset.m === selMuscle);
+      });
+      $('trMapSub').textContent = mapRange === 'last'
+        ? (list[0] ? (list[0].title || 'Workout') + ' · ' + relDate(list[0].workout_perform_date).split(' · ')[0] : 'No workouts yet')
+        : list.length + ' workout' + (list.length === 1 ? '' : 's') + ' · sets per muscle';
+      const rows = Object.entries(sc).sort((a, b) => b[1] - a[1]);
+      $('trMusc').innerHTML = rows.length ? rows.slice(0, 8).map(([k, v]) =>
+        '<div class="tr-musc-row"' + (k === selMuscle ? ' style="color:#fff"' : '') + '><span>' + MUSCLE_NAMES[k] + '</span><div class="tr-musc-bar"><i style="width:' + (100 * v / max) + '%"></i></div><b>' + (Math.round(v * 2) / 2) + '</b></div>').join('')
+        : '<div class="tr-msg">Log a workout in Lyfta and the muscles you train light up here.</div>';
+      if (mapRange !== 'last' && list.length) {
+        const missed = MAJOR.filter((k) => !sc[k]).map((k) => MUSCLE_NAMES[k]);
+        $('trGap').innerHTML = missed.length ? 'Not trained in this window: <b>' + missed.join(', ') + '</b>' : 'Every major muscle group hit — nice balance.';
+      } else $('trGap').innerHTML = '';
+    }
+    $('trMapSeg').addEventListener('click', (e) => {
+      const b = e.target.closest('button'); if (!b) return;
+      mapRange = b.dataset.r;
+      $('trMapSeg').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+      renderMap();
+    });
+    document.querySelectorAll('#trRoot .tr-body .m').forEach((el) => el.addEventListener('click', () => {
+      selMuscle = selMuscle === el.dataset.m ? null : el.dataset.m;
+      renderMap();
+      if (selMuscle) {
+        const { sc } = muscleScores();
+        $('trMapSub').textContent = MUSCLE_NAMES[selMuscle] + ' · ' + (Math.round((sc[selMuscle] || 0) * 2) / 2) + ' sets';
+      }
+    }));
+
+    // ---------- Last workout + history ----------
+    // Best estimated 1RM per exercise before a given workout, for PR badges.
+    function priorBest(name, before) {
+      let best = 0;
+      workouts.forEach((w) => {
+        if (wDate(w) >= before) return;
+        (w.exercises || []).forEach((ex) => {
+          if (ex.excercise_name !== name) return;
+          doneSets(ex).forEach((s) => { best = Math.max(best, e1rm(num(s.weight), num(s.reps))); });
+        });
+      });
+      return best;
+    }
+    function renderWorkout(w) {
+      const a = stravaFor(w);
+      const u = unit();
+      $('trLastTitle').textContent = w.title || 'Workout';
+      $('trLastSub').textContent = relDate(w.workout_perform_date) + (w.body_weight ? ' · body ' + fmtW(num(w.body_weight)) + ' ' + u : '');
+      $('trLastStats').innerHTML =
+        stat(a ? fmtDur(a.moving_time || a.elapsed_time) : '—', 'Duration')
+        + stat(fmtVol(wVolume(w)), 'Volume ' + u)
+        + stat(wSets(w), 'Sets')
+        + stat(a && a.average_heartrate ? Math.round(a.average_heartrate) : '—', 'Avg HR');
+      $('trLastList').innerHTML = (w.exercises || []).map((ex) => {
+        const sets = doneSets(ex);
+        if (!sets.length) return '';
+        const top = sets.reduce((b, s) => (e1rm(num(s.weight), num(s.reps)) > e1rm(num(b.weight), num(b.reps)) ? s : b), sets[0]);
+        const topE = e1rm(num(top.weight), num(top.reps));
+        const prev = priorBest(ex.excercise_name, wDate(w));
+        const isPR = sets.some((s) => s.record_type) || (prev > 0 && topE > prev + 0.01);
+        const m = musclesFor(ex.excercise_name).p.map((k) => MUSCLE_NAMES[k]).join(', ');
+        const vol = sets.reduce((t, s) => t + num(s.weight) * num(s.reps), 0);
+        return '<div class="tr-ex"><div class="tr-ex-top">'
+          + (ex.exercise_image ? '<img class="tr-ex-img" src="' + esc(ex.exercise_image) + '" alt="" loading="lazy">' : '')
+          + '<div style="flex:1;min-width:0"><div class="tr-ex-name">' + esc(ex.excercise_name) + '</div>'
+          + '<div class="tr-ex-meta">' + sets.length + ' sets' + (vol ? ' · ' + fmtVol(vol) + ' ' + u : '') + (m ? ' · ' + esc(m) : '') + '</div></div>'
+          + (isPR ? '<span class="tr-pr">PR</span>' : '') + '</div>'
+          + '<div class="tr-sets">' + sets.map((s) => {
+              const label = num(s.weight) ? fmtW(num(s.weight)) + '×' + num(s.reps) : num(s.reps) ? num(s.reps) + ' reps' : num(s.duration) + 's';
+              return '<span class="tr-set' + (s === top ? ' top' : '') + '">' + label + '</span>';
+            }).join('') + '</div></div>';
+      }).join('');
+    }
+    function stat(v, l) { return '<div class="tr-stat"><div class="tr-stat-val">' + esc(v) + '</div><div class="tr-stat-label">' + esc(l) + '</div></div>'; }
+    function renderLast() {
+      if (!workouts.length) {
+        $('trLastTitle').textContent = 'No workouts yet';
+        $('trLastSub').textContent = '';
+        $('trLastStats').innerHTML = ''; $('trLastList').innerHTML = ''; $('trHist').innerHTML = '';
+        return;
+      }
+      renderWorkout(workouts[0]);
+      const rest = workouts.slice(1, histOpen ? 15 : 1);
+      $('trHist').innerHTML = (histOpen ? rest.map((w, i) =>
+        '<div class="tr-hist-row" data-i="' + (i + 1) + '"><div><div class="tr-hist-name">' + esc(w.title || 'Workout') + '</div>'
+        + '<div class="tr-hist-meta">' + esc(relDate(w.workout_perform_date)) + ' · ' + wSets(w) + ' sets</div></div>'
+        + '<div class="tr-hist-vol">' + fmtVol(wVolume(w)) + ' ' + unit() + '</div></div>').join('') : '')
+        + (workouts.length > 1 ? '<button class="tr-more" type="button" id="trMore">' + (histOpen ? 'Hide history' : 'Show previous workouts (' + (workouts.length - 1) + ')') + '</button>' : '');
+      const more = $('trMore');
+      if (more) more.onclick = () => { histOpen = !histOpen; renderLast(); };
+      $('trHist').querySelectorAll('.tr-hist-row').forEach((row) => row.onclick = () => {
+        renderWorkout(workouts[Number(row.dataset.i)]);
+        $('trLastTitle').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+    }
+
+    // ---------- Lift progress ----------
+    function renderLifts() {
+      const byEx = {};
+      workouts.slice().reverse().forEach((w) => (w.exercises || []).forEach((ex) => {
+        const sets = doneSets(ex).filter((s) => num(s.weight) > 0 && num(s.reps) > 0);
+        if (!sets.length) return;
+        const best = Math.max(...sets.map((s) => e1rm(num(s.weight), num(s.reps))));
+        const top = sets.reduce((b, s) => (num(s.weight) > num(b.weight) ? s : b), sets[0]);
+        (byEx[ex.excercise_name] = byEx[ex.excercise_name] || []).push({ d: wDate(w), v: best, top });
+      }));
+      const lifts = Object.entries(byEx).sort((a, b) => b[1].length - a[1].length || b[1][b[1].length - 1].v - a[1][a[1].length - 1].v).slice(0, 8);
+      if (!lifts.length) { $('trLifts').className = 'tr-msg'; $('trLifts').textContent = 'Your weighted lifts will chart here once Lyfta has a few sessions.'; return; }
+      const u = unit();
+      $('trLifts').className = '';
+      $('trLifts').innerHTML = lifts.map(([name, pts]) => {
+        const last = pts[pts.length - 1];
+        const ref = pts.length > 1 ? (pts.filter((p) => p.d < daysAgo(30)).pop() || pts[0]) : null;
+        const diff = ref && ref !== last ? last.v - ref.v : 0;
+        const vals = pts.map((p) => p.v), mn = Math.min(...vals), mx = Math.max(...vals), span = mx - mn || 1;
+        const line = pts.length > 1 ? pts.map((p, i) => ((i / (pts.length - 1)) * 80 + 2).toFixed(1) + ',' + (24 - ((p.v - mn) / span) * 20).toFixed(1)).join(' ') : '';
+        const cls = diff > 0.5 ? 'up' : diff < -0.5 ? 'down' : 'flat';
+        return '<div class="tr-lift"><div style="min-width:0"><div class="tr-lift-name">' + esc(name) + '</div>'
+          + '<div class="tr-lift-meta">best ' + fmtW(num(last.top.weight)) + '×' + num(last.top.reps) + ' · ' + pts.length + ' sessions</div></div>'
+          + '<svg viewBox="0 0 84 28">' + (line ? '<polyline points="' + line + '" fill="none" stroke="' + (cls === 'down' ? '#ff8a8a' : '#ff6b35') + '" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>' : '') + '</svg>'
+          + '<div class="tr-lift-1rm">' + fmtW(last.v) + '<small class="' + cls + '">' + (ref && ref !== last ? (diff >= 0 ? '+' : '') + fmtW(diff) + ' ' + u : u) + '</small></div></div>';
+      }).join('');
+    }
+
+    // ---------- Import into the progressive-overload coach ----------
+    // Each Lyfta set becomes a coach log { weight, reps, date, lid }, where
+    // lid = "<workout id>:<set id>" so a set is only ever imported once.
+    // Exercises are matched by name; unknown ones are created and put on the
+    // split day whose name appears in the workout title (or best muscle fit).
+    function normName(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]/g, ''); }
+    function guessDay(st, w, exName) {
+      const title = String(w.title || '').toLowerCase();
+      const byTitle = st.days.find((d) => title.includes(String(d.name).toLowerCase()));
+      if (byTitle) return byTitle.id;
+      const m = musclesFor(exName).p[0] || '';
+      const want = /chest|front_delts|side_delts|triceps/.test(m) ? 'push'
+        : /lats|upper_back|rear_delts|biceps|traps|forearms/.test(m) ? 'pull'
+        : /quads|hamstrings|glutes|calves|adductors|lower_back/.test(m) ? 'leg' : '';
+      const d = want && st.days.find((x) => String(x.name).toLowerCase().includes(want) || String(x.id).toLowerCase().includes(want));
+      return (d || st.days[0]).id;
+    }
+    function importToCoach() {
+      let raw;
+      try { raw = localStorage.getItem(COACH_KEY); } catch { return 0; }
+      if (!raw) return -1; // coach state not saved yet (e.g. still pulling from the cloud)
+      let st; try { st = JSON.parse(raw); } catch { return 0; }
+      if (!Array.isArray(st.exercises) || !st.logs || !Array.isArray(st.days) || !st.days.length) return 0;
+      const seen = new Set();
+      Object.values(st.logs).forEach((arr) => (arr || []).forEach((l) => { if (l.lid) seen.add(l.lid); }));
+      let added = 0;
+      workouts.slice().reverse().forEach((w) => (w.exercises || []).forEach((ex) => {
+        const sets = doneSets(ex).filter((s) => num(s.reps) > 0);
+        if (!sets.length) return;
+        const key = normName(ex.excercise_name);
+        let target = st.exercises.find((e) => e.lyftaId === ex.exercise_id) || st.exercises.find((e) => normName(e.name) === key);
+        sets.forEach((s) => {
+          const lid = w.id + ':' + s.id;
+          if (seen.has(lid)) return;
+          if (!target) {
+            const bw = sets.every((x) => !num(x.weight));
+            target = { id: 'lyfta_' + ex.exercise_id + '_' + Date.now(), name: ex.excercise_name, gym: 'both', day: guessDay(st, w, ex.excercise_name),
+              repMin: 6, repMax: 10, step: 2.5, startWeight: num(s.weight), bw, lyftaId: ex.exercise_id };
+            st.exercises.push(target);
+          } else if (target.lyftaId == null) target.lyftaId = ex.exercise_id;
+          (st.logs[target.id] = st.logs[target.id] || []).push({ weight: num(s.weight), reps: num(s.reps), date: w.workout_perform_date, lid, src: 'lyfta' });
+          seen.add(lid); added++;
+        });
+        if (target && st.logs[target.id]) st.logs[target.id].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+      }));
+      if (added) {
+        try { localStorage.setItem(COACH_KEY, JSON.stringify(st)); } catch { return 0; }
+        if (typeof window.poReload === 'function') window.poReload();
+      }
+      return added;
+    }
+
+    // ---------- Sync ----------
+    function setSync(ok, text) { $('trSync').innerHTML = '<span class="tr-dot' + (ok ? '' : ' off') + '"></span>' + esc(text); }
+    async function fetchWorkouts() {
+      const from = dayKey(daysAgo(DAYS_BACK));
+      const all = [];
+      for (let page = 1; page <= 5; page++) {
+        const r = await fetch('/api/lyfta?path=/workouts&limit=100&page=' + page + '&from=' + from, { cache: 'no-store' });
+        const j = await r.json().catch(() => ({}));
+        if (r.status === 500 && j.error === 'not configured') throw Object.assign(new Error('setup'), { setup: true });
+        if (!r.ok || j.status === false) throw new Error('Lyfta ' + r.status + (j.message ? ': ' + j.message : j.error ? ': ' + j.error : ''));
+        all.push(...(j.workouts || []));
+        if (!j.total_pages || page >= j.total_pages) break;
+      }
+      return all.sort((a, b) => wDate(b) - wDate(a));
+    }
+    async function sync() {
+      try {
+        setSync(false, 'syncing…');
+        const fresh = await fetchWorkouts();
+        const changed = JSON.stringify(fresh.map((w) => [w.id, wSets(w)])) !== JSON.stringify(workouts.map((w) => [w.id, wSets(w)]));
+        workouts = fresh;
+        try { localStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), workouts })); } catch {}
+        $('trSetup').innerHTML = '';
+        let added = importToCoach();
+        if (added < 0) { added = 0; setTimeout(() => { if (importToCoach() > 0) renderAllTr(); }, 5000); }
+        lastSync = Date.now();
+        setSync(true, 'Lyfta · ' + new Date().toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) + (added ? ' · +' + added + ' sets' : ''));
+        if (changed || added) renderAllTr();
+      } catch (e) {
+        if (e.setup) {
+          setSync(false, 'Lyfta not linked');
+          $('trSetup').innerHTML = '<div class="tr-msg" style="margin-bottom:12px">Link Lyfta: create an API key at <a href="https://my.lyfta.app/community/api" target="_blank" rel="noopener">my.lyfta.app/community/api</a>, add it in Vercel as <code>LYFTA_API_KEY</code>, then redeploy.</div>';
+        } else {
+          setSync(false, 'offline');
+          $('trSetup').innerHTML = '<div class="tr-err">' + esc(e.message || String(e)) + '</div>';
+        }
+      }
+    }
+    function renderAllTr() {
+      renderOverview(); renderMap(); renderLast(); renderLifts(); renderLoad();
+    }
+
+    renderAllTr();
+    renderRecovery();
+    sync();
+    window.addEventListener('strava:update', () => { renderOverview(); renderLast(); });
+    // Live: re-sync when the page comes back into view and every 2 minutes while open.
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) return;
+      if (Date.now() - lastSync > 20000) sync();
+      renderRecovery();
+    });
+    setInterval(() => { if (!document.hidden) sync(); }, 120000);
+  })();
+  </script>
+
   <!-- WEIGHT + PROGRESS PHOTOS -->
   <div class="wt-section">
     <div class="wt-divider"><span>WEIGHT</span></div>
@@ -1787,6 +2459,10 @@ img, video, canvas, svg { max-width: 100%; }
         $('svWkTime').textContent = secs ? fmtDur(secs) : '0m';
         $('svWkHr').textContent = hrs.length ? String(Math.round(hrs.reduce((s, a) => s + a.average_heartrate, 0) / hrs.length)) : '—';
         renderList(acts.slice(0, 10));
+        // Share with the training dashboard so it can pair Lyfta
+        // workouts with Strava's duration / heart rate.
+        window.svActivities = acts;
+        window.dispatchEvent(new CustomEvent('strava:update', { detail: acts }));
         $('svUpdated').textContent = 'Updated ' + new Date().toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
       } catch (e) {
         showErr(e.message || String(e));
@@ -1804,6 +2480,10 @@ img, video, canvas, svg { max-width: 100%; }
       }
     }
     render();
+    // Keep it live: refresh when the tab comes back into view and every
+    // 2 minutes while it's open.
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && load()) loadData(); });
+    setInterval(() => { if (!document.hidden && load()) loadData(); }, 120000);
   })();
   </script>
 </div>
@@ -3608,6 +4288,9 @@ img, video, canvas, svg { max-width: 100%; }
     try { wtRender(); } catch {}
     try { photosRender(); } catch {}
   }
+  // Lets the Lyfta importer (further down) redraw the coach after it
+  // writes new sets into po_coach_v1.
+  window.poReload = pcRerender;
 
   function pcApplyRemoteState(remote) {
     if (!remote || typeof remote !== 'object') return false;
