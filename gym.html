@@ -1965,6 +1965,8 @@ img, video, canvas, svg { max-width: 100%; }
     renderRecovery();
     sync();
     window.addEventListener('strava:update', () => { renderOverview(); renderLast(); });
+    // Coach units changed → re-import Lyfta sets in the new unit.
+    window.addEventListener('po:units', () => { if (importToCoach() > 0) renderAllTr(); });
     // Live: re-sync when the page comes back into view and every 2 minutes while open.
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) return;
@@ -3485,9 +3487,32 @@ img, video, canvas, svg { max-width: 100%; }
     $('setModalBg').classList.remove('show');
     renderAll();
   });
+  // Switching kg <-> lb converts every stored weight, not just the label.
+  // Lyfta-imported sets are dropped and re-imported from Lyfta in the new
+  // unit (exact values instead of a double-rounded conversion).
+  function convertUnits(to) {
+    const f = to === 'lb' ? 1 / 0.45359237 : 0.45359237;
+    const conv = (w, stepTo) => Math.round(w * f / stepTo) * stepTo;
+    const STEPS = to === 'lb' ? { 1.25: 2.5, 2.5: 5, 5: 10, 10: 20 } : { 2.5: 1.25, 5: 2.5, 10: 5, 20: 10 };
+    state.exercises.forEach(ex => {
+      if (ex.startWeight) ex.startWeight = conv(ex.startWeight, to === 'lb' ? 2.5 : 0.5);
+      if (ex.step) ex.step = STEPS[ex.step] || conv(ex.step, to === 'lb' ? 0.5 : 0.25);
+    });
+    Object.keys(state.logs).forEach(id => {
+      state.logs[id] = (state.logs[id] || []).filter(l => l.src !== 'lyfta')
+        .map(l => Object.assign({}, l, { weight: l.weight ? conv(l.weight, to === 'lb' ? 0.5 : 0.25) : 0 }));
+    });
+    delete state.lyftaImportVer;
+    wtEntries = wtEntries.map(e => Object.assign({}, e, { weight: Math.round(e.weight * f * 10) / 10 }));
+    wtSave(wtEntries);
+    state.units = to;
+    saveState();
+    renderAll();
+    window.dispatchEvent(new Event('po:units'));
+  }
   $('setUnitsSeg').querySelectorAll('button').forEach(b => {
     b.addEventListener('click', () => {
-      state.units = b.dataset.u; saveState();
+      if (b.dataset.u !== state.units) convertUnits(b.dataset.u);
       $('setUnitsSeg').querySelectorAll('button').forEach(x => x.classList.remove('active'));
       b.classList.add('active');
       if (typeof wtRender === 'function') wtRender();
