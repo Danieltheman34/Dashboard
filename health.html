@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#050506">
 <meta name="color-scheme" content="dark">
-<title>Daily Stack — Customizable Template</title>
+<title>Health & Food</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="sync.js" defer></script>
 <script src="topbar.js" defer></script>
@@ -508,6 +508,530 @@ main {
 <body>
 
 <main>
+
+  <!-- ===== MEALS — photo → macros via Claude (uses the Nova key) =====
+       Storage (localStorage):
+         meals:day:YYYY-MM-DD → [meal]   (cloud-synced)
+         meals:goals          → {kcal, p, c, f} (cloud-synced)
+         meals:thumbs         → {mealId: dataUrl} (this device only) -->
+  <style>
+    .ml-section { margin-bottom: 32px; }
+    .ml-card { padding: 20px; background: rgba(255,255,255,0.025); border-radius: 22px; box-shadow: 0 1px 0 0 rgba(255,255,255,0.06) inset, 0 12px 40px rgba(0,0,0,0.45); margin-bottom: 12px; }
+    .ml-daybar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+    .ml-daybtn { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--border); background: rgba(255,255,255,0.04); color: var(--text-secondary); font-size: 16px; cursor: pointer; }
+    .ml-daybtn:disabled { opacity: 0.3; cursor: default; }
+    .ml-day { text-align: center; }
+    .ml-day b { display: block; font-size: 16px; color: var(--text-primary); font-weight: 700; }
+    .ml-day span { font-size: 11px; color: var(--text-tertiary); font-family: var(--font-mono); }
+    .ml-top { display: grid; grid-template-columns: 132px 1fr; gap: 18px; align-items: center; }
+    .ml-ring { position: relative; width: 132px; height: 132px; }
+    .ml-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+    .ml-ring-num { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .ml-ring-num b { font-size: 30px; color: var(--text-primary); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; line-height: 1; }
+    .ml-ring-num span { font-size: 10px; letter-spacing: 0.16em; color: var(--text-tertiary); font-weight: 700; margin-top: 5px; text-transform: uppercase; }
+    .ml-ring-num small { font-size: 11px; color: var(--text-tertiary); font-family: var(--font-mono); margin-top: 3px; }
+    .ml-macros { display: grid; gap: 11px; }
+    .ml-macro-head { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px; }
+    .ml-macro-head span { color: var(--text-secondary); font-weight: 600; }
+    .ml-macro-head b { color: var(--text-primary); font-family: var(--font-mono); font-weight: 600; font-size: 11.5px; }
+    .ml-macro-head b em { color: var(--text-tertiary); font-style: normal; }
+    .ml-bar { height: 7px; border-radius: 999px; background: rgba(255,255,255,0.06); overflow: hidden; }
+    .ml-bar i { display: block; height: 100%; border-radius: 999px; transition: width 0.6s cubic-bezier(0.22,1,0.36,1); }
+    .ml-actions { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 18px; }
+    .ml-snap { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 14px; border-radius: 14px; border: 0; background: linear-gradient(180deg, #7EF0B4, #3FC487); color: #06200F; font-family: inherit; font-size: 14.5px; font-weight: 700; cursor: pointer; box-shadow: 0 8px 24px rgba(63,196,135,0.25); }
+    .ml-snap:active { transform: scale(0.98); }
+    .ml-ghost { padding: 14px 16px; border-radius: 14px; border: 1px solid var(--border-strong); background: rgba(255,255,255,0.04); color: var(--text-primary); font-family: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+    .ml-list { margin-top: 6px; }
+    .ml-meal { display: flex; gap: 12px; align-items: center; padding: 12px 0; border-top: 1px solid var(--border); cursor: pointer; }
+    .ml-meal:first-child { border-top: 0; }
+    .ml-thumb { width: 52px; height: 52px; border-radius: 12px; object-fit: cover; flex-shrink: 0; background: rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center; font-size: 22px; }
+    .ml-meal-main { flex: 1; min-width: 0; }
+    .ml-meal-name { font-size: 14.5px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ml-meal-meta { font-size: 11.5px; color: var(--text-tertiary); font-family: var(--font-mono); margin-top: 3px; }
+    .ml-meal-kcal { text-align: right; font-size: 16px; font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+    .ml-meal-kcal small { display: block; font-size: 10px; color: var(--text-tertiary); font-weight: 600; letter-spacing: 0.1em; }
+    .ml-empty { text-align: center; font-size: 13px; color: var(--text-tertiary); padding: 18px 8px 6px; line-height: 1.5; }
+    .ml-subhead { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
+    .ml-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-tertiary); }
+    .ml-link { background: none; border: 0; color: var(--text-secondary); font-family: inherit; font-size: 12px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+    .ml-week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; align-items: end; height: 120px; }
+    .ml-wk-col { display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; justify-content: flex-end; cursor: pointer; }
+    .ml-wk-bar { width: 100%; max-width: 30px; border-radius: 7px 7px 3px 3px; background: rgba(107,227,164,0.55); position: relative; min-height: 3px; }
+    .ml-wk-bar.over { background: rgba(255,138,77,0.7); }
+    .ml-wk-bar.empty { background: rgba(255,255,255,0.06); }
+    .ml-wk-col.sel .ml-wk-bar { outline: 1.5px solid rgba(255,255,255,0.7); outline-offset: 2px; }
+    .ml-wk-lbl { font-size: 10px; color: var(--text-tertiary); font-family: var(--font-mono); }
+    .ml-wk-goal { position: relative; height: 0; border-top: 1px dashed rgba(255,255,255,0.25); margin-top: -1px; }
+    .ml-wk-sum { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; }
+    .ml-wk-stat { background: rgba(255,255,255,0.025); border: 1px solid var(--border); border-radius: 12px; padding: 10px 6px; text-align: center; }
+    .ml-wk-stat b { display: block; font-size: 17px; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+    .ml-wk-stat span { font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-tertiary); font-weight: 700; }
+
+    /* Sheet */
+    .ml-sheet-bg { position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.6); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); display: none; align-items: flex-end; justify-content: center; }
+    .ml-sheet-bg.open { display: flex; }
+    .ml-sheet { width: 100%; max-width: 560px; max-height: 92vh; overflow-y: auto; background: #111114; border: 1px solid var(--border-strong); border-bottom: 0; border-radius: 22px 22px 0 0; padding: 18px 18px calc(18px + env(safe-area-inset-bottom)); }
+    @media (min-width: 640px) { .ml-sheet-bg { align-items: center; } .ml-sheet { border-radius: 22px; border-bottom: 1px solid var(--border-strong); } }
+    .ml-sheet-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+    .ml-sheet-title { font-size: 17px; font-weight: 700; color: var(--text-primary); }
+    .ml-x { background: none; border: 0; color: var(--text-tertiary); font-size: 24px; line-height: 1; cursor: pointer; }
+    .ml-photo { width: 100%; max-height: 240px; object-fit: cover; border-radius: 14px; margin-bottom: 12px; display: block; }
+    .ml-in { width: 100%; padding: 11px 12px; border-radius: 11px; border: 1px solid var(--border-strong); background: var(--bg-input); color: var(--text-primary); font-family: inherit; font-size: 14px; outline: none; }
+    .ml-in:focus { border-color: rgba(107,227,164,0.5); }
+    textarea.ml-in { resize: vertical; min-height: 64px; }
+    .ml-row2 { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 10px; }
+    .ml-hint { font-size: 11.5px; color: var(--text-tertiary); margin-top: 6px; line-height: 1.45; }
+    .ml-hint a { color: var(--text-secondary); }
+    .ml-loading { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 26px 0; color: var(--text-secondary); font-size: 13px; }
+    .ml-spin { width: 30px; height: 30px; border-radius: 50%; border: 3px solid rgba(255,255,255,0.1); border-top-color: #6BE3A4; animation: mlspin 0.9s linear infinite; }
+    @keyframes mlspin { to { transform: rotate(360deg); } }
+    .ml-err { background: rgba(255,107,107,0.08); border: 1px solid rgba(255,107,107,0.28); color: #FF8A8A; padding: 10px 12px; border-radius: 10px; font-size: 12.5px; margin: 10px 0; word-break: break-word; }
+    .ml-tot { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 12px 0; }
+    .ml-tot div { background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 11px; padding: 9px 4px; text-align: center; }
+    .ml-tot b { display: block; font-size: 17px; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+    .ml-tot span { font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-tertiary); font-weight: 700; }
+    .ml-conf { font-size: 11.5px; color: var(--text-tertiary); margin-bottom: 8px; line-height: 1.45; }
+    .ml-item { border: 1px solid var(--border); border-radius: 13px; padding: 10px; margin-bottom: 8px; background: rgba(255,255,255,0.02); }
+    .ml-item-top { display: grid; grid-template-columns: 1fr 86px 28px; gap: 6px; align-items: center; }
+    .ml-item-top .ml-in { padding: 8px 10px; font-size: 13.5px; }
+    .ml-g { position: relative; }
+    .ml-g .ml-in { padding-right: 22px; text-align: right; }
+    .ml-g span { position: absolute; right: 9px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--text-tertiary); pointer-events: none; }
+    .ml-del { background: none; border: 0; color: var(--text-tertiary); font-size: 18px; cursor: pointer; }
+    .ml-item-macros { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 7px; }
+    .ml-item-macros label { font-size: 9.5px; color: var(--text-tertiary); letter-spacing: 0.08em; text-transform: uppercase; font-weight: 700; }
+    .ml-item-macros .ml-in { padding: 6px 8px; font-size: 13px; margin-top: 3px; font-variant-numeric: tabular-nums; }
+    .ml-portion { font-size: 11px; color: var(--text-tertiary); margin-top: 6px; font-style: italic; }
+    .ml-slots { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 12px; }
+    .ml-slot { padding: 6px 11px; border-radius: 999px; border: 1px solid var(--border-strong); background: none; color: var(--text-secondary); font-family: inherit; font-size: 12px; cursor: pointer; }
+    .ml-slot.on { background: rgba(107,227,164,0.14); border-color: rgba(107,227,164,0.5); color: #9BF2C4; }
+    .ml-sheet-actions { display: grid; grid-template-columns: auto 1fr; gap: 8px; margin-top: 14px; }
+    .ml-danger { padding: 13px 14px; border-radius: 13px; border: 1px solid rgba(255,138,138,0.3); background: none; color: #FF8A8A; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .ml-goal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .ml-goal-grid label { font-size: 11px; color: var(--text-tertiary); font-weight: 600; }
+    .ml-goal-grid .ml-in { margin-top: 4px; }
+    @media (max-width: 440px) {
+      .ml-top { grid-template-columns: 112px 1fr; gap: 14px; }
+      .ml-ring { width: 112px; height: 112px; }
+      .ml-ring-num b { font-size: 25px; }
+      .ml-item-macros { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+
+  <div class="ml-section" id="meals">
+    <div class="section-title">Food & Macros</div>
+    <div class="ml-card">
+      <div class="ml-daybar">
+        <button class="ml-daybtn" id="mlPrev" type="button" aria-label="Previous day">‹</button>
+        <div class="ml-day"><b id="mlDayName">Today</b><span id="mlDayDate">—</span></div>
+        <button class="ml-daybtn" id="mlNext" type="button" aria-label="Next day">›</button>
+      </div>
+      <div class="ml-top">
+        <div class="ml-ring">
+          <svg viewBox="0 0 132 132"><circle cx="66" cy="66" r="56" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="11"/>
+            <circle id="mlRing" cx="66" cy="66" r="56" fill="none" stroke="#6BE3A4" stroke-width="11" stroke-linecap="round" stroke-dasharray="351.86" stroke-dashoffset="351.86" style="transition: stroke-dashoffset 0.7s cubic-bezier(0.22,1,0.36,1), stroke 0.3s"/></svg>
+          <div class="ml-ring-num"><b id="mlKcal">0</b><span>kcal</span><small id="mlKcalLeft">—</small></div>
+        </div>
+        <div class="ml-macros" id="mlMacros"></div>
+      </div>
+      <div class="ml-actions">
+        <button class="ml-snap" id="mlSnap" type="button">📸 Snap a meal</button>
+        <button class="ml-ghost" id="mlDescribe" type="button">✍️ Describe</button>
+      </div>
+      <input type="file" id="mlFile" accept="image/*" hidden>
+    </div>
+
+    <div class="ml-card">
+      <div class="ml-subhead"><span class="ml-eyebrow" id="mlListTitle">Meals</span><span class="ml-eyebrow" id="mlListCount"></span></div>
+      <div class="ml-list" id="mlList"></div>
+    </div>
+
+    <div class="ml-card">
+      <div class="ml-subhead"><span class="ml-eyebrow">Last 7 days</span><button class="ml-link" id="mlGoalsBtn" type="button">Edit goals</button></div>
+      <div class="ml-week" id="mlWeek"></div>
+      <div class="ml-wk-sum" id="mlWeekSum"></div>
+    </div>
+  </div>
+
+  <div class="ml-sheet-bg" id="mlSheetBg">
+    <div class="ml-sheet" role="dialog" aria-modal="true" aria-labelledby="mlSheetTitle">
+      <div class="ml-sheet-head"><span class="ml-sheet-title" id="mlSheetTitle">Log meal</span><button class="ml-x" id="mlClose" type="button" aria-label="Close">×</button></div>
+      <div id="mlSheetBody"></div>
+    </div>
+  </div>
+
+  <script>
+  (function () {
+    'use strict';
+    const DAY_PREFIX = 'meals:day:';
+    const GOALS_KEY = 'meals:goals';
+    const THUMBS_KEY = 'meals:thumbs';
+    const NOVA_KEY = 'nova_lite_api_key';
+    const MODEL = 'claude-opus-5-5';
+    const COLORS = { p: '#7DD3FC', c: '#F2C063', f: '#F0A3C8' };
+    const NAMES = { p: 'Protein', c: 'Carbs', f: 'Fat' };
+    const SLOTS = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+    const readLS = (k, f) => { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? f : v; } catch { return f; } };
+    const writeLS = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } };
+    const r0 = (n) => Math.round(Number(n) || 0);
+    const r1 = (n) => Math.round((Number(n) || 0) * 10) / 10;
+
+    function dayKey(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+    function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
+    let viewDate = new Date(); viewDate.setHours(12, 0, 0, 0);
+    const isToday = () => dayKey(viewDate) === dayKey(new Date());
+
+    function goals() { return Object.assign({ kcal: 2600, p: 200, c: 260, f: 80 }, readLS(GOALS_KEY, {})); }
+    function mealsFor(k) { return readLS(DAY_PREFIX + k, []); }
+    function saveMeals(k, arr) {
+      if (arr.length) writeLS(DAY_PREFIX + k, arr);
+      else try { localStorage.removeItem(DAY_PREFIX + k); } catch {}
+    }
+    function totals(items) {
+      return items.reduce((t, i) => ({ kcal: t.kcal + (+i.kcal || 0), p: t.p + (+i.p || 0), c: t.c + (+i.c || 0), f: t.f + (+i.f || 0), fib: t.fib + (+i.fib || 0) }), { kcal: 0, p: 0, c: 0, f: 0, fib: 0 });
+    }
+    function dayTotals(k) { return totals(mealsFor(k).flatMap((m) => m.items || [])); }
+    function thumbs() { return readLS(THUMBS_KEY, {}); }
+    function saveThumb(id, url) {
+      const t = thumbs(); t[id] = url;
+      // Keep the most recent 120 photos so the browser's storage doesn't fill up.
+      const ids = Object.keys(t);
+      if (ids.length > 120) ids.slice(0, ids.length - 120).forEach((x) => delete t[x]);
+      if (!writeLS(THUMBS_KEY, t)) { const ks = Object.keys(t); ks.slice(0, Math.ceil(ks.length / 2)).forEach((x) => delete t[x]); writeLS(THUMBS_KEY, t); }
+    }
+    function slotFor(date) { const h = date.getHours(); return h < 11 ? 'Breakfast' : h < 16 ? 'Lunch' : h < 21 ? 'Dinner' : 'Snack'; }
+
+    // ---------- Main render ----------
+    function render() {
+      const k = dayKey(viewDate), g = goals(), t = dayTotals(k);
+      const today = new Date();
+      $('mlDayName').textContent = isToday() ? 'Today' : dayKey(addDays(today, -1)) === k ? 'Yesterday' : viewDate.toLocaleDateString(undefined, { weekday: 'long' });
+      $('mlDayDate').textContent = viewDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      $('mlNext').disabled = isToday();
+      const C = 351.86, frac = Math.min(1, t.kcal / g.kcal);
+      $('mlRing').style.strokeDashoffset = String(C * (1 - frac));
+      $('mlRing').style.stroke = t.kcal > g.kcal * 1.05 ? '#FF8A4D' : '#6BE3A4';
+      $('mlKcal').textContent = r0(t.kcal).toLocaleString();
+      const left = r0(g.kcal - t.kcal);
+      $('mlKcalLeft').textContent = left >= 0 ? left.toLocaleString() + ' left' : Math.abs(left).toLocaleString() + ' over';
+      $('mlMacros').innerHTML = ['p', 'c', 'f'].map((m) =>
+        '<div><div class="ml-macro-head"><span>' + NAMES[m] + '</span><b>' + r0(t[m]) + '<em> / ' + g[m] + 'g</em></b></div>'
+        + '<div class="ml-bar"><i style="width:' + Math.min(100, 100 * t[m] / g[m]) + '%;background:' + COLORS[m] + '"></i></div></div>').join('')
+        + (t.fib ? '<div style="font-size:11px;color:var(--text-tertiary);font-family:var(--font-mono)">fiber ' + r0(t.fib) + 'g</div>' : '');
+      renderList(k);
+      renderWeek();
+    }
+    function renderList(k) {
+      const meals = mealsFor(k).slice().sort((a, b) => (a.time < b.time ? -1 : 1));
+      const th = thumbs();
+      $('mlListTitle').textContent = isToday() ? "Today's meals" : 'Meals';
+      $('mlListCount').textContent = meals.length ? meals.length + ' logged' : '';
+      $('mlList').innerHTML = meals.length ? meals.map((m) => {
+        const t = totals(m.items || []);
+        const time = new Date(m.time).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+        return '<div class="ml-meal" data-id="' + esc(m.id) + '">'
+          + (th[m.id] ? '<img class="ml-thumb" src="' + th[m.id] + '" alt="">' : '<div class="ml-thumb">' + (m.photo ? '📷' : '🍽️') + '</div>')
+          + '<div class="ml-meal-main"><div class="ml-meal-name">' + esc(m.name || 'Meal') + '</div>'
+          + '<div class="ml-meal-meta">' + esc(m.slot || '') + ' · ' + time + ' · P' + r0(t.p) + ' C' + r0(t.c) + ' F' + r0(t.f) + '</div></div>'
+          + '<div class="ml-meal-kcal">' + r0(t.kcal) + '<small>KCAL</small></div></div>';
+      }).join('') : '<div class="ml-empty">' + (isToday() ? 'Nothing logged yet today.<br>Snap a photo of your next meal.' : 'Nothing logged this day.') + '</div>';
+      $('mlList').querySelectorAll('.ml-meal').forEach((el) => el.addEventListener('click', () => {
+        const m = mealsFor(k).find((x) => x.id === el.dataset.id);
+        if (m) openEditor(JSON.parse(JSON.stringify(m)), k, false);
+      }));
+    }
+    function renderWeek() {
+      const g = goals(), days = [];
+      for (let i = 6; i >= 0; i--) { const d = addDays(new Date(), -i); days.push({ d, k: dayKey(d), t: dayTotals(dayKey(d)) }); }
+      const max = Math.max(g.kcal * 1.15, ...days.map((x) => x.t.kcal));
+      const sel = dayKey(viewDate);
+      $('mlWeek').innerHTML = days.map((x) =>
+        '<div class="ml-wk-col' + (x.k === sel ? ' sel' : '') + '" data-k="' + x.k + '" title="' + r0(x.t.kcal) + ' kcal · ' + r0(x.t.p) + 'g protein">'
+        + '<div class="ml-wk-bar' + (!x.t.kcal ? ' empty' : x.t.kcal > g.kcal * 1.05 ? ' over' : '') + '" style="height:' + Math.max(3, 92 * x.t.kcal / max) + 'px"></div>'
+        + '<div class="ml-wk-lbl">' + x.d.toLocaleDateString(undefined, { weekday: 'narrow' }) + '</div></div>').join('');
+      $('mlWeek').querySelectorAll('.ml-wk-col').forEach((el) => el.addEventListener('click', () => {
+        const [y, m, d] = el.dataset.k.split('-').map(Number); viewDate = new Date(y, m - 1, d, 12); render();
+      }));
+      const logged = days.filter((x) => x.t.kcal > 0);
+      const avg = (f) => logged.length ? r0(logged.reduce((s, x) => s + x.t[f], 0) / logged.length) : '—';
+      const hit = logged.filter((x) => x.t.p >= g.p * 0.9).length;
+      $('mlWeekSum').innerHTML = '<div class="ml-wk-stat"><b>' + avg('kcal') + '</b><span>Avg kcal</span></div>'
+        + '<div class="ml-wk-stat"><b>' + avg('p') + (logged.length ? 'g' : '') + '</b><span>Avg protein</span></div>'
+        + '<div class="ml-wk-stat"><b>' + hit + '/' + logged.length + '</b><span>Protein goal</span></div>';
+    }
+    $('mlPrev').addEventListener('click', () => { viewDate = addDays(viewDate, -1); render(); });
+    $('mlNext').addEventListener('click', () => { if (!isToday()) { viewDate = addDays(viewDate, 1); render(); } });
+
+    // ---------- Sheet ----------
+    const sheetBg = $('mlSheetBg'), sheetBody = $('mlSheetBody');
+    function openSheet(title, html) { $('mlSheetTitle').textContent = title; sheetBody.innerHTML = html; sheetBg.classList.add('open'); document.body.style.overflow = 'hidden'; }
+    function closeSheet() { sheetBg.classList.remove('open'); document.body.style.overflow = ''; }
+    $('mlClose').addEventListener('click', closeSheet);
+    sheetBg.addEventListener('click', (e) => { if (e.target === sheetBg) closeSheet(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && sheetBg.classList.contains('open')) closeSheet(); });
+
+    function apiKey() { try { return localStorage.getItem(NOVA_KEY) || ''; } catch { return ''; } }
+    function keyField() {
+      return apiKey() ? '' : '<div class="ml-hint" style="margin-bottom:10px">Meal scanning uses your Anthropic API key (the same one Nova uses). Paste it once:</div>'
+        + '<input class="ml-in" id="mlKeyIn" type="password" placeholder="sk-ant-…" autocomplete="off" style="margin-bottom:10px">';
+    }
+    function takeKey() {
+      const el = $('mlKeyIn');
+      if (el && el.value.trim()) { try { localStorage.setItem(NOVA_KEY, el.value.trim()); } catch {} }
+      return apiKey();
+    }
+
+    // Photo → compressed JPEG (for the API) + small thumbnail (for the list).
+    function loadImage(file) {
+      return new Promise((res, rej) => {
+        const url = URL.createObjectURL(file), img = new Image();
+        img.onload = () => { URL.revokeObjectURL(url); res(img); };
+        img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('Could not read that photo. Try a JPEG or PNG.')); };
+        img.src = url;
+      });
+    }
+    function toJpeg(img, maxSide, q) {
+      const s = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.naturalWidth * s); c.height = Math.round(img.naturalHeight * s);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      return c.toDataURL('image/jpeg', q);
+    }
+    function squareThumb(img) {
+      const side = Math.min(img.naturalWidth, img.naturalHeight), c = document.createElement('canvas');
+      c.width = c.height = 144;
+      c.getContext('2d').drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, 144, 144);
+      return c.toDataURL('image/jpeg', 0.7);
+    }
+
+    $('mlSnap').addEventListener('click', () => { $('mlFile').value = ''; $('mlFile').click(); });
+    $('mlFile').addEventListener('change', async () => {
+      const file = $('mlFile').files && $('mlFile').files[0];
+      if (!file) return;
+      let img;
+      try { img = await loadImage(file); } catch (e) { openSheet('Log meal', '<div class="ml-err">' + esc(e.message) + '</div>'); return; }
+      const photo = toJpeg(img, 1280, 0.82), thumb = squareThumb(img);
+      openSheet('Snap a meal', '<img class="ml-photo" src="' + photo + '" alt="Meal photo">' + keyField()
+        + '<textarea class="ml-in" id="mlNote" placeholder="Optional: anything the photo can\'t show — e.g. cooked in butter, 2 tortillas, 8oz chicken"></textarea>'
+        + '<button class="ml-snap" id="mlGo" type="button" style="width:100%;margin-top:10px">Analyze meal</button>');
+      $('mlGo').addEventListener('click', () => analyze({ photo, thumb, note: $('mlNote').value.trim() }));
+    });
+    $('mlDescribe').addEventListener('click', () => {
+      openSheet('Describe a meal', keyField()
+        + '<textarea class="ml-in" id="mlNote" placeholder="e.g. Chipotle bowl: double chicken, white rice, black beans, fajita veggies, cheese, guac"></textarea>'
+        + '<button class="ml-snap" id="mlGo" type="button" style="width:100%;margin-top:10px">Estimate macros</button>'
+        + '<button class="ml-ghost" id="mlManual" type="button" style="width:100%;margin-top:8px">Enter numbers myself</button>');
+      $('mlGo').addEventListener('click', () => {
+        const note = $('mlNote').value.trim();
+        if (!note) { $('mlNote').focus(); return; }
+        analyze({ note });
+      });
+      $('mlManual').addEventListener('click', () => {
+        const now = new Date();
+        openEditor({ id: newId(), time: mealTime(now), slot: slotFor(now), name: $('mlNote').value.trim() || 'Meal', items: [blankItem()] }, dayKey(viewDate), true);
+      });
+    });
+    function newId() { return 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+    function blankItem() { return { name: '', portion: '', g: 0, kcal: 0, p: 0, c: 0, f: 0, fib: 0 }; }
+    // Meals logged while browsing a past day land on that day at the current clock time.
+    function mealTime(now) { const d = new Date(viewDate); d.setHours(now.getHours(), now.getMinutes(), 0, 0); return d.toISOString(); }
+
+    // ---------- Claude call ----------
+    const SYSTEM = 'You are a sports nutritionist estimating the nutrition of a meal for someone tracking macros. '
+      + 'Identify every distinct food and drink, estimate each portion in grams (plus a household measure such as "1 cup" or "palm-sized"), '
+      + 'and estimate calories, protein, carbohydrates, fat and fiber from standard nutrition data (USDA-style values for the food as served). '
+      + 'Use visual cues for scale (plate, utensils, hands, packaging). Include cooking oils, butter, sauces and dressings you can see or that the dish normally contains, as separate items when they are significant. '
+      + 'If the user adds details, they override what you infer from the photo. Give realistic best estimates rather than lowballing; when unsure, say so in the notes. '
+      + 'Name the meal in a few words, like a food diary entry.';
+    const SCHEMA = {
+      type: 'object', additionalProperties: false,
+      required: ['meal_name', 'items', 'confidence', 'notes'],
+      properties: {
+        meal_name: { type: 'string' },
+        items: { type: 'array', items: {
+          type: 'object', additionalProperties: false,
+          required: ['name', 'portion', 'grams', 'calories', 'protein_g', 'carbs_g', 'fat_g', 'fiber_g'],
+          properties: {
+            name: { type: 'string' }, portion: { type: 'string' }, grams: { type: 'number' },
+            calories: { type: 'number' }, protein_g: { type: 'number' }, carbs_g: { type: 'number' }, fat_g: { type: 'number' }, fiber_g: { type: 'number' },
+          } } },
+        confidence: { type: 'string', enum: ['low', 'medium', 'high'] },
+        notes: { type: 'string' },
+      },
+    };
+    async function askClaude(photo, note) {
+      const key = takeKey();
+      if (!key) throw new Error('Add your Anthropic API key above first.');
+      const content = [];
+      if (photo) content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: photo.split(',')[1] } });
+      content.push({ type: 'text', text: (photo ? 'Estimate the nutrition of this meal.' : 'Estimate the nutrition of this meal from my description.') + (note ? '\n\nDetails from me: ' + note : '') });
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+          'anthropic-beta': 'server-side-fallback-2026-07-01',
+        },
+        body: JSON.stringify({
+          model: MODEL, max_tokens: 16000, system: SYSTEM,
+          output_config: { effort: 'medium', format: { type: 'json_schema', schema: SCHEMA } },
+          fallbacks: 'default',
+          messages: [{ role: 'user', content }],
+        }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (res.status === 401) throw new Error('That API key was rejected. Check it on the Nova page.');
+        throw new Error((j.error && j.error.message) || ('Request failed (' + res.status + ')'));
+      }
+      if (j.stop_reason === 'refusal') throw new Error('Claude declined to analyze this one. Try describing the meal instead.');
+      if (j.stop_reason === 'max_tokens') throw new Error('The answer got cut off — try again.');
+      const text = (j.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('');
+      try { return JSON.parse(text); } catch { throw new Error('Could not read the estimate — try again.'); }
+    }
+    async function analyze({ photo, thumb, note }) {
+      if (!takeKey()) { const el = $('mlKeyIn'); if (el) el.focus(); return; }
+      const keep = sheetBody.innerHTML;
+      sheetBody.innerHTML = (photo ? '<img class="ml-photo" src="' + photo + '" alt="">' : '')
+        + '<div class="ml-loading"><div class="ml-spin"></div>Reading your meal… this takes 10–30 seconds</div>';
+      try {
+        const r = await askClaude(photo, note);
+        const now = new Date();
+        const meal = {
+          id: newId(), time: mealTime(now), slot: slotFor(now), name: r.meal_name || 'Meal', photo: !!photo,
+          confidence: r.confidence, notes: r.notes, note,
+          items: (r.items || []).map((i) => ({ name: i.name, portion: i.portion, g: r0(i.grams), kcal: r0(i.calories), p: r1(i.protein_g), c: r1(i.carbs_g), f: r1(i.fat_g), fib: r1(i.fiber_g) })),
+        };
+        if (!meal.items.length) meal.items.push(blankItem());
+        openEditor(meal, dayKey(viewDate), true, thumb, photo);
+      } catch (e) {
+        sheetBody.innerHTML = keep;
+        sheetBody.insertAdjacentHTML('afterbegin', '<div class="ml-err">' + esc(e.message || String(e)) + '</div>');
+        const go = $('mlGo');
+        if (go) go.addEventListener('click', () => analyze({ photo, thumb, note: ($('mlNote') || {}).value || note }));
+        const man = $('mlManual');
+        if (man) man.addEventListener('click', () => { const now = new Date(); openEditor({ id: newId(), time: mealTime(now), slot: slotFor(now), name: note || 'Meal', items: [blankItem()] }, dayKey(viewDate), true); });
+      }
+    }
+
+    // ---------- Review / edit ----------
+    function openEditor(meal, k, isNew, thumb, photo) {
+      const th = thumb || thumbs()[meal.id];
+      const html = (photo ? '<img class="ml-photo" src="' + photo + '" alt="">' : th ? '<img class="ml-photo" src="' + th + '" alt="" style="max-height:140px">' : '')
+        + '<input class="ml-in" id="mlName" value="' + esc(meal.name) + '" placeholder="Meal name">'
+        + '<div class="ml-slots" id="mlSlots" style="margin-top:10px">' + SLOTS.map((s) => '<button type="button" class="ml-slot' + (s === meal.slot ? ' on' : '') + '" data-s="' + s + '">' + s + '</button>').join('') + '</div>'
+        + '<div class="ml-tot" id="mlTot"></div>'
+        + (meal.notes || meal.confidence ? '<div class="ml-conf">' + (meal.confidence ? '<b>' + esc(meal.confidence[0].toUpperCase() + meal.confidence.slice(1)) + ' confidence.</b> ' : '') + esc(meal.notes || '') + '</div>' : '')
+        + '<div id="mlItems"></div>'
+        + '<button class="ml-ghost" id="mlAddItem" type="button" style="width:100%">+ Add item</button>'
+        + '<div class="ml-sheet-actions">' + (isNew ? '<button class="ml-ghost" id="mlCancel" type="button">Cancel</button>' : '<button class="ml-danger" id="mlDelete" type="button">Delete</button>')
+        + '<button class="ml-snap" id="mlSave" type="button">' + (isNew ? 'Save meal' : 'Save changes') + '</button></div>'
+        + (!isNew ? '<button class="ml-link" id="mlAgain" type="button" style="display:block;margin:12px auto 0">Log this again today</button>' : '');
+      openSheet(isNew ? 'Review meal' : 'Edit meal', html);
+      const items = meal.items;
+      // base = values the estimate came with, so changing grams rescales the macros.
+      items.forEach((i) => { i._base = i._base || { g: i.g, kcal: i.kcal, p: i.p, c: i.c, f: i.f, fib: i.fib }; });
+      function drawTot() {
+        const t = totals(items);
+        $('mlTot').innerHTML = '<div><b>' + r0(t.kcal) + '</b><span>kcal</span></div><div><b>' + r0(t.p) + '</b><span>protein</span></div><div><b>' + r0(t.c) + '</b><span>carbs</span></div><div><b>' + r0(t.f) + '</b><span>fat</span></div>';
+      }
+      function drawItems() {
+        $('mlItems').innerHTML = items.map((i, n) =>
+          '<div class="ml-item" data-n="' + n + '"><div class="ml-item-top">'
+          + '<input class="ml-in" data-f="name" value="' + esc(i.name) + '" placeholder="Food">'
+          + '<div class="ml-g"><input class="ml-in" data-f="g" inputmode="decimal" value="' + (i.g || '') + '" placeholder="0"><span>g</span></div>'
+          + '<button class="ml-del" type="button" aria-label="Remove item">×</button></div>'
+          + '<div class="ml-item-macros">'
+          + ['kcal', 'p', 'c', 'f'].map((f) => '<div><label>' + ({ kcal: 'kcal', p: 'protein', c: 'carbs', f: 'fat' })[f] + '</label><input class="ml-in" data-f="' + f + '" inputmode="decimal" value="' + (i[f] || 0) + '"></div>').join('')
+          + '</div>' + (i.portion ? '<div class="ml-portion">' + esc(i.portion) + '</div>' : '') + '</div>').join('');
+        $('mlItems').querySelectorAll('.ml-item').forEach((row) => {
+          const i = items[Number(row.dataset.n)];
+          row.querySelectorAll('input').forEach((inp) => inp.addEventListener('input', () => {
+            const f = inp.dataset.f;
+            if (f === 'name') { i.name = inp.value; return; }
+            const v = parseFloat(inp.value) || 0;
+            if (f === 'g') {
+              i.g = v;
+              if (i._base.g > 0) {
+                const s = v / i._base.g;
+                ['kcal', 'p', 'c', 'f', 'fib'].forEach((m) => { i[m] = m === 'kcal' ? r0(i._base[m] * s) : r1(i._base[m] * s); });
+                ['kcal', 'p', 'c', 'f'].forEach((m) => { row.querySelector('[data-f="' + m + '"]').value = i[m]; });
+              }
+            } else {
+              i[f] = v;
+              i._base = { g: i.g, kcal: i.kcal, p: i.p, c: i.c, f: i.f, fib: i.fib };
+            }
+            drawTot();
+          }));
+          row.querySelector('.ml-del').addEventListener('click', () => { items.splice(Number(row.dataset.n), 1); drawItems(); drawTot(); });
+        });
+      }
+      drawItems(); drawTot();
+      $('mlSlots').addEventListener('click', (e) => {
+        const b = e.target.closest('.ml-slot'); if (!b) return;
+        meal.slot = b.dataset.s;
+        $('mlSlots').querySelectorAll('.ml-slot').forEach((x) => x.classList.toggle('on', x === b));
+      });
+      $('mlAddItem').addEventListener('click', () => { items.push(Object.assign(blankItem(), { _base: { g: 0, kcal: 0, p: 0, c: 0, f: 0, fib: 0 } })); drawItems(); drawTot(); });
+      const clean = () => items.filter((i) => i.name.trim() || i.kcal).map((i) => { const o = Object.assign({}, i); delete o._base; return o; });
+      $('mlSave').addEventListener('click', () => {
+        meal.name = $('mlName').value.trim() || 'Meal';
+        meal.items = clean();
+        const arr = mealsFor(k).filter((m) => m.id !== meal.id);
+        arr.push(meal);
+        saveMeals(k, arr);
+        if (thumb) saveThumb(meal.id, thumb);
+        closeSheet(); render();
+      });
+      if (isNew) $('mlCancel').addEventListener('click', closeSheet);
+      else {
+        $('mlDelete').addEventListener('click', () => {
+          if (!confirm('Delete this meal?')) return;
+          saveMeals(k, mealsFor(k).filter((m) => m.id !== meal.id));
+          const t = thumbs(); delete t[meal.id]; writeLS(THUMBS_KEY, t);
+          closeSheet(); render();
+        });
+        $('mlAgain').addEventListener('click', () => {
+          const now = new Date(), tk = dayKey(now);
+          const copy = Object.assign({}, meal, { id: newId(), time: now.toISOString(), slot: slotFor(now), items: clean() });
+          const arr = mealsFor(tk); arr.push(copy); saveMeals(tk, arr);
+          if (th) saveThumb(copy.id, th);
+          viewDate = new Date(); viewDate.setHours(12, 0, 0, 0);
+          closeSheet(); render();
+        });
+      }
+    }
+
+    // ---------- Goals ----------
+    $('mlGoalsBtn').addEventListener('click', () => {
+      const g = goals();
+      openSheet('Daily goals', '<div class="ml-goal-grid">'
+        + [['kcal', 'Calories'], ['p', 'Protein (g)'], ['c', 'Carbs (g)'], ['f', 'Fat (g)']].map(([k, l]) => '<label>' + l + '<input class="ml-in" data-g="' + k + '" inputmode="numeric" value="' + g[k] + '"></label>').join('')
+        + '</div><div class="ml-hint" id="mlGoalHint"></div>'
+        + '<div class="ml-sheet-actions"><button class="ml-ghost" id="mlCancel" type="button">Cancel</button><button class="ml-snap" id="mlSave" type="button">Save goals</button></div>');
+      const hint = () => {
+        const v = (k) => parseFloat(sheetBody.querySelector('[data-g="' + k + '"]').value) || 0;
+        const fromMacros = r0(v('p') * 4 + v('c') * 4 + v('f') * 9);
+        $('mlGoalHint').textContent = 'Your macros add up to ' + fromMacros.toLocaleString() + ' kcal (protein & carbs 4 kcal/g, fat 9 kcal/g).';
+      };
+      sheetBody.querySelectorAll('[data-g]').forEach((i) => i.addEventListener('input', hint)); hint();
+      $('mlCancel').addEventListener('click', closeSheet);
+      $('mlSave').addEventListener('click', () => {
+        const out = {};
+        sheetBody.querySelectorAll('[data-g]').forEach((i) => { out[i.dataset.g] = Math.max(1, r0(i.value)); });
+        writeLS(GOALS_KEY, out); closeSheet(); render();
+      });
+    });
+
+    // Re-render when synced data arrives from another device (sync.js fires 'storage').
+    window.addEventListener('storage', () => { if (!sheetBg.classList.contains('open')) render(); });
+    // Roll over to the new day if the page stays open past midnight.
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && !sheetBg.classList.contains('open')) render(); });
+    render();
+  })();
+  </script>
 
   <!-- ===== WHOOP card (full) ===== -->
   <style>
@@ -1459,8 +1983,8 @@ document.addEventListener('DOMContentLoaded', function () {
   if (typeof initCloudSync !== 'function') return;
   initCloudSync({
     appKey: 'health',
-    syncedKeys: ['stack:items', 'stack:version', 'stack:low', 'po_water_v1'],
-    syncedPrefixes: ['stack:taken:'],
+    syncedKeys: ['stack:items', 'stack:version', 'stack:low', 'po_water_v1', 'meals:goals'],
+    syncedPrefixes: ['stack:taken:', 'meals:day:'],
     onApplied: function () {
       window.dispatchEvent(new Event('storage'));
     }
