@@ -5,7 +5,10 @@
 <script src="/api/config"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#050506">
+<meta name="theme-color" content="#050807">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
 <meta name="color-scheme" content="dark">
 <title>Health & Food</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -13,7 +16,7 @@
 <script src="topbar.js" defer></script>
 <style>
 :root {
-  --bg: #050506;
+  --bg: #050807;
   --bg-card: rgba(255, 255, 255, 0.04);
   --bg-secondary: rgba(255, 255, 255, 0.035);
   --bg-input: rgba(0, 0, 0, 0.28);
@@ -55,8 +58,8 @@ body { min-height: 100vh; position: relative; overflow-x: hidden; }
 body::before {
   content: ''; position: fixed; inset: 0;
   background:
-    radial-gradient(60% 50% at 82% 14%, rgba(224, 118, 88, 0.16) 0%, transparent 60%),
-    radial-gradient(50% 40% at 18% 90%, rgba(180, 180, 200, 0.06) 0%, transparent 60%);
+    radial-gradient(60% 50% at 80% 8%, rgba(70, 190, 140, 0.16) 0%, transparent 60%),
+    radial-gradient(55% 45% at 10% 70%, rgba(40, 120, 95, 0.12) 0%, transparent 60%);
   filter: blur(40px);
   pointer-events: none; z-index: 0;
   animation: drift 36s ease-in-out infinite alternate;
@@ -509,186 +512,302 @@ main {
 
 <main>
 
-  <!-- ===== MEALS — photo → macros via Claude (uses the Nova key) =====
+  <!-- ===== FUEL — meals & macros. Photo → macros via Claude (Nova's key),
+       barcodes via Open Food Facts.
        Storage (localStorage):
-         meals:day:YYYY-MM-DD → [meal]   (cloud-synced)
-         meals:goals          → {kcal, p, c, f} (cloud-synced)
-         meals:thumbs         → {mealId: dataUrl} (this device only) -->
+         meals:day:YYYY-MM-DD  → [meal]                    (cloud-synced)
+         meals:type:YYYY-MM-DD → 'gym' | 'rest' override    (cloud-synced)
+         meals:goals           → { gym:{kcal,p,c,f}, rest:{…} } (cloud-synced)
+         meals:favs            → [meal template]            (cloud-synced)
+         meals:thumbs          → { mealId: dataUrl }        (this device only)
+         meals:tipDone         → '1'                        (this device only) -->
   <style>
-    .ml-section { margin-bottom: 32px; }
-    .ml-card { padding: 20px; background: rgba(255,255,255,0.025); border-radius: 22px; box-shadow: 0 1px 0 0 rgba(255,255,255,0.06) inset, 0 12px 40px rgba(0,0,0,0.45); margin-bottom: 12px; }
-    .ml-daybar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-    .ml-daybtn { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--border); background: rgba(255,255,255,0.04); color: var(--text-secondary); font-size: 16px; cursor: pointer; }
-    .ml-daybtn:disabled { opacity: 0.3; cursor: default; }
-    .ml-day { text-align: center; }
-    .ml-day b { display: block; font-size: 16px; color: var(--text-primary); font-weight: 700; }
-    .ml-day span { font-size: 11px; color: var(--text-tertiary); font-family: var(--font-mono); }
-    .ml-top { display: grid; grid-template-columns: 132px 1fr; gap: 18px; align-items: center; }
-    .ml-ring { position: relative; width: 132px; height: 132px; }
-    .ml-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
-    .ml-ring-num { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-    .ml-ring-num b { font-size: 30px; color: var(--text-primary); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; line-height: 1; }
-    .ml-ring-num span { font-size: 10px; letter-spacing: 0.16em; color: var(--text-tertiary); font-weight: 700; margin-top: 5px; text-transform: uppercase; }
-    .ml-ring-num small { font-size: 11px; color: var(--text-tertiary); font-family: var(--font-mono); margin-top: 3px; }
-    .ml-macros { display: grid; gap: 11px; }
-    .ml-macro-head { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px; }
-    .ml-macro-head span { color: var(--text-secondary); font-weight: 600; }
-    .ml-macro-head b { color: var(--text-primary); font-family: var(--font-mono); font-weight: 600; font-size: 11.5px; }
-    .ml-macro-head b em { color: var(--text-tertiary); font-style: normal; }
-    .ml-bar { height: 7px; border-radius: 999px; background: rgba(255,255,255,0.06); overflow: hidden; }
-    .ml-bar i { display: block; height: 100%; border-radius: 999px; transition: width 0.6s cubic-bezier(0.22,1,0.36,1); }
-    .ml-actions { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 18px; }
-    .ml-snap { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 14px; border-radius: 14px; border: 0; background: linear-gradient(180deg, #7EF0B4, #3FC487); color: #06200F; font-family: inherit; font-size: 14.5px; font-weight: 700; cursor: pointer; box-shadow: 0 8px 24px rgba(63,196,135,0.25); }
-    .ml-snap:active { transform: scale(0.98); }
-    .ml-ghost { padding: 14px 16px; border-radius: 14px; border: 1px solid var(--border-strong); background: rgba(255,255,255,0.04); color: var(--text-primary); font-family: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; }
-    .ml-list { margin-top: 6px; }
-    .ml-meal { display: flex; gap: 12px; align-items: center; padding: 12px 0; border-top: 1px solid var(--border); cursor: pointer; }
-    .ml-meal:first-child { border-top: 0; }
-    .ml-thumb { width: 52px; height: 52px; border-radius: 12px; object-fit: cover; flex-shrink: 0; background: rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center; font-size: 22px; }
-    .ml-meal-main { flex: 1; min-width: 0; }
-    .ml-meal-name { font-size: 14.5px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .ml-meal-meta { font-size: 11.5px; color: var(--text-tertiary); font-family: var(--font-mono); margin-top: 3px; }
-    .ml-meal-kcal { text-align: right; font-size: 16px; font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums; }
-    .ml-meal-kcal small { display: block; font-size: 10px; color: var(--text-tertiary); font-weight: 600; letter-spacing: 0.1em; }
-    .ml-empty { text-align: center; font-size: 13px; color: var(--text-tertiary); padding: 18px 8px 6px; line-height: 1.5; }
-    .ml-subhead { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
-    .ml-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-tertiary); }
-    .ml-link { background: none; border: 0; color: var(--text-secondary); font-family: inherit; font-size: 12px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
-    .ml-week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; align-items: end; height: 120px; }
-    .ml-wk-col { display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; justify-content: flex-end; cursor: pointer; }
-    .ml-wk-bar { width: 100%; max-width: 30px; border-radius: 7px 7px 3px 3px; background: rgba(107,227,164,0.55); position: relative; min-height: 3px; }
-    .ml-wk-bar.over { background: rgba(255,138,77,0.7); }
-    .ml-wk-bar.empty { background: rgba(255,255,255,0.06); }
-    .ml-wk-col.sel .ml-wk-bar { outline: 1.5px solid rgba(255,255,255,0.7); outline-offset: 2px; }
-    .ml-wk-lbl { font-size: 10px; color: var(--text-tertiary); font-family: var(--font-mono); }
-    .ml-wk-goal { position: relative; height: 0; border-top: 1px dashed rgba(255,255,255,0.25); margin-top: -1px; }
-    .ml-wk-sum { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; }
-    .ml-wk-stat { background: rgba(255,255,255,0.025); border: 1px solid var(--border); border-radius: 12px; padding: 10px 6px; text-align: center; }
-    .ml-wk-stat b { display: block; font-size: 17px; color: var(--text-primary); font-variant-numeric: tabular-nums; }
-    .ml-wk-stat span { font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-tertiary); font-weight: 700; }
+    .fu { --mint: #86EFC0; --mint-2: #4FD69A; --ink: #F4F7F5; --dim: #9AA8A1; --mute: #5F6C66;
+          --line: rgba(160, 255, 210, 0.08); --line-2: rgba(160, 255, 210, 0.14);
+          --card: linear-gradient(180deg, rgba(20, 34, 29, 0.72), rgba(10, 18, 15, 0.72));
+          --p: #86EFC0; --c: #A9C7E6; --f: #F2C063;
+          --serif: 'Instrument Serif', 'Iowan Old Style', Georgia, serif;
+          color: var(--dim); }
+    .fu-mono { font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.22em; font-size: 10.5px; color: var(--mute); }
+    .fu-head { margin-bottom: 22px; }
+    .fu-title-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 6px 0 14px; }
+    .fu-title { font-family: var(--serif); font-style: italic; font-weight: 400; font-size: clamp(44px, 9vw, 64px); line-height: 1; color: var(--ink); letter-spacing: -0.01em; margin: 0; }
+    .fu-pill { font-family: var(--font-mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; padding: 6px 12px; border-radius: 999px; border: 1px solid rgba(134,239,192,0.45); color: var(--mint); background: rgba(134,239,192,0.06); white-space: nowrap; }
+    .fu-pill.over { color: #FFB27A; border-color: rgba(255,178,122,0.45); background: rgba(255,178,122,0.06); }
+    .fu-pill.idle { color: var(--dim); border-color: var(--line-2); background: none; }
+    .fu-bar-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .fu-date { min-width: 150px; }
+    .fu-arrow { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line-2); background: rgba(255,255,255,0.02); color: var(--ink); font-size: 16px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+    .fu-arrow:disabled { border-color: transparent; color: var(--mute); cursor: default; }
+    .fu-seg { display: inline-flex; padding: 3px; border-radius: 999px; border: 1px solid var(--line-2); background: rgba(0,0,0,0.25); }
+    .fu-seg button { font-family: var(--font-mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; padding: 8px 14px; border-radius: 999px; border: 0; background: none; color: var(--dim); cursor: pointer; white-space: nowrap; }
+    .fu-seg button::before { content: '•'; margin-right: 6px; opacity: 0.7; }
+    .fu-seg button.on { background: var(--mint); color: #062216; box-shadow: 0 0 22px rgba(134,239,192,0.35); }
+    .fu-streak { font-family: var(--font-mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: var(--mint); white-space: nowrap; }
+    .fu-streak::before { content: '•'; margin-right: 6px; }
+
+    .fu-card { position: relative; background: var(--card); border: 1px solid var(--line); border-radius: 18px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 20px 50px rgba(0,0,0,0.45); overflow: hidden; }
+    .fu-card::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(70% 60% at 0% 0%, rgba(134,239,192,0.06), transparent 60%); }
+    .fu-tip { padding: 18px 20px; margin-bottom: 26px; }
+    .fu-tip ol { margin: 0; padding-left: 20px; display: grid; gap: 9px; font-size: 14px; color: var(--dim); }
+    .fu-tip b { color: var(--ink); font-weight: 600; }
+    .fu-tip button { margin-top: 12px; background: none; border: 0; padding: 0; color: var(--mint); font-family: inherit; font-size: 14px; cursor: pointer; }
+
+    .fu-sec { display: flex; align-items: center; gap: 12px; margin: 0 0 14px; }
+    .fu-sec i { font-family: var(--serif); font-style: italic; font-size: 17px; color: var(--dim); }
+    .fu-sec span { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.24em; text-transform: uppercase; color: var(--dim); }
+    .fu-sec::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, var(--line-2), transparent); }
+    .fu-sec .fu-link { margin-left: auto; order: 3; }
+
+    .fu-today { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 18px; }
+    @media (max-width: 600px) { .fu-today { grid-template-columns: 1fr; } }
+    .fu-cal { padding: 22px; }
+    .fu-cal-label { display: flex; align-items: center; gap: 10px; }
+    .fu-cal-label svg { color: var(--mint); }
+    .fu-cal-num { display: flex; align-items: flex-end; gap: 14px; margin: 14px 0 20px; }
+    .fu-cal-num b { font-family: var(--serif); font-weight: 400; font-size: clamp(64px, 14vw, 88px); line-height: 0.85; color: var(--ink); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+    .fu-cal-num span { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.22em; line-height: 1.6; color: var(--mint); padding-bottom: 6px; }
+    .fu-cal-num.over span { color: #FFB27A; }
+    .fu-track { position: relative; height: 12px; border-radius: 999px; background: rgba(255,255,255,0.05); overflow: hidden; }
+    .fu-track::after { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 calc(8.333% - 1px), rgba(0,0,0,0.45) calc(8.333% - 1px) 8.333%); }
+    .fu-fill { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: linear-gradient(90deg, #2E8F62, var(--mint)); box-shadow: 0 0 18px rgba(134,239,192,0.45); transition: width 0.8s cubic-bezier(0.22,1,0.36,1); }
+    .fu-fill.over { background: linear-gradient(90deg, #C9783E, #FFB27A); box-shadow: 0 0 18px rgba(255,178,122,0.4); }
+    .fu-cal-foot { display: flex; justify-content: space-between; margin-top: 12px; font-family: var(--font-mono); font-size: 12px; color: var(--mute); }
+    .fu-cal-foot b { color: var(--ink); font-weight: 600; margin-right: 4px; }
+
+    .fu-mac { padding: 18px 22px; display: grid; gap: 4px; align-content: center; }
+    .fu-mrow { display: grid; grid-template-columns: 40px 1fr 54px; gap: 14px; align-items: center; padding: 10px 0; }
+    .fu-ico { width: 40px; height: 40px; border-radius: 11px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.04); border: 1px solid var(--line); }
+    .fu-mhead { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+    .fu-mhead b { font-family: var(--font-mono); font-size: 12px; color: var(--ink); font-weight: 600; }
+    .fu-mhead b em { font-style: normal; color: var(--mute); }
+    .fu-mbar { height: 6px; border-radius: 999px; background: rgba(255,255,255,0.06); overflow: hidden; }
+    .fu-mbar i { display: block; height: 100%; border-radius: 999px; transition: width 0.8s cubic-bezier(0.22,1,0.36,1); }
+    .fu-pct { font-family: var(--serif); font-style: italic; font-size: 26px; text-align: right; line-height: 1; }
+
+    .fu-chips { display: flex; align-items: center; gap: 10px; overflow-x: auto; padding: 2px 0 10px; margin-bottom: 4px; scrollbar-width: none; -webkit-mask-image: linear-gradient(90deg, #000 92%, transparent); mask-image: linear-gradient(90deg, #000 92%, transparent); }
+    .fu-chips::-webkit-scrollbar { display: none; }
+    .fu-chips .fu-mono { flex-shrink: 0; min-width: 78px; }
+    .fu-chip { flex-shrink: 0; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line-2); background: rgba(255,255,255,0.025); color: var(--ink); font-family: inherit; font-size: 13.5px; cursor: pointer; white-space: nowrap; transition: background 0.15s, border-color 0.15s; }
+    .fu-chip:hover { background: rgba(134,239,192,0.08); border-color: rgba(134,239,192,0.35); }
+    .fu-chip em { font-style: normal; color: var(--mute); margin-left: 4px; }
+
+    .fu-snap { width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 14px; padding: 18px; border: 0; border-radius: 16px; background: linear-gradient(180deg, #A3F5CF, #6FDDA9); color: #052417; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer; box-shadow: 0 0 0 1px rgba(255,255,255,0.25) inset, 0 14px 40px rgba(111,221,169,0.28); transition: transform 0.12s, box-shadow 0.2s; }
+    .fu-snap:hover { box-shadow: 0 0 0 1px rgba(255,255,255,0.3) inset, 0 16px 48px rgba(111,221,169,0.4); }
+    .fu-snap:active { transform: scale(0.99); }
+    .fu-tools { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; }
+    .fu-tool { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 14px 10px; border-radius: 14px; border: 1px solid var(--line); background: var(--card); color: var(--ink); font-family: inherit; font-size: 14.5px; font-weight: 600; cursor: pointer; }
+    .fu-tool span { width: 30px; height: 30px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.05); flex-shrink: 0; }
+    .fu-tool:hover { border-color: var(--line-2); }
+    @media (max-width: 440px) { .fu-tool { flex-direction: column; gap: 6px; font-size: 12.5px; padding: 12px 6px; } }
+
+    .fu-meals { padding: 6px 18px; margin: 30px 0 0; }
+    .fu-meal { display: flex; gap: 14px; align-items: center; padding: 14px 0; border-top: 1px solid var(--line); cursor: pointer; }
+    .fu-meal:first-child { border-top: 0; }
+    .fu-thumb { width: 54px; height: 54px; border-radius: 13px; object-fit: cover; flex-shrink: 0; background: rgba(255,255,255,0.04); border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; font-size: 22px; }
+    .fu-meal-main { flex: 1; min-width: 0; }
+    .fu-meal-name { font-size: 15px; color: var(--ink); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .fu-meal-meta { font-family: var(--font-mono); font-size: 11px; color: var(--mute); margin-top: 4px; letter-spacing: 0.04em; }
+    .fu-meal-meta i { font-style: normal; } .fu-meal-meta .p { color: var(--p); } .fu-meal-meta .c { color: var(--c); } .fu-meal-meta .f { color: var(--f); }
+    .fu-meal-kcal { font-family: var(--serif); font-size: 28px; color: var(--ink); line-height: 1; text-align: right; }
+    .fu-meal-kcal small { display: block; font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.2em; color: var(--mute); margin-top: 4px; }
+    .fu-empty { text-align: center; padding: 26px 10px; font-size: 14px; color: var(--mute); }
+    .fu-empty b { display: block; font-family: var(--serif); font-style: italic; font-weight: 400; font-size: 24px; color: var(--dim); margin-bottom: 4px; }
+
+    .fu-week { padding: 20px 20px 16px; margin-top: 30px; }
+    .fu-wk { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; height: 130px; align-items: end; position: relative; }
+    .fu-wk-goal { position: absolute; left: 0; right: 0; border-top: 1px dashed rgba(134,239,192,0.3); pointer-events: none; }
+    .fu-wk-goal span { position: absolute; right: 0; top: -16px; font-family: var(--font-mono); font-size: 9.5px; color: var(--mute); letter-spacing: 0.1em; }
+    .fu-wk-col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 8px; height: 100%; cursor: pointer; }
+    .fu-wk-bar { width: 100%; max-width: 34px; min-height: 3px; border-radius: 8px 8px 4px 4px; background: linear-gradient(180deg, rgba(134,239,192,0.85), rgba(46,143,98,0.5)); }
+    .fu-wk-bar.over { background: linear-gradient(180deg, rgba(255,178,122,0.9), rgba(201,120,62,0.5)); }
+    .fu-wk-bar.empty { background: rgba(255,255,255,0.05); }
+    .fu-wk-col.sel .fu-wk-bar { box-shadow: 0 0 0 1.5px rgba(255,255,255,0.75); }
+    .fu-wk-lbl { font-family: var(--font-mono); font-size: 10px; color: var(--mute); letter-spacing: 0.1em; }
+    .fu-wk-sum { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+    .fu-wk-sum b { display: block; font-family: var(--serif); font-size: 30px; color: var(--ink); font-weight: 400; line-height: 1; }
+    .fu-link { background: none; border: 0; padding: 0; color: var(--mint); font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.18em; text-transform: uppercase; cursor: pointer; }
 
     /* Sheet */
-    .ml-sheet-bg { position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.6); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); display: none; align-items: flex-end; justify-content: center; }
-    .ml-sheet-bg.open { display: flex; }
-    .ml-sheet { width: 100%; max-width: 560px; max-height: 92vh; overflow-y: auto; background: #111114; border: 1px solid var(--border-strong); border-bottom: 0; border-radius: 22px 22px 0 0; padding: 18px 18px calc(18px + env(safe-area-inset-bottom)); }
-    @media (min-width: 640px) { .ml-sheet-bg { align-items: center; } .ml-sheet { border-radius: 22px; border-bottom: 1px solid var(--border-strong); } }
-    .ml-sheet-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
-    .ml-sheet-title { font-size: 17px; font-weight: 700; color: var(--text-primary); }
-    .ml-x { background: none; border: 0; color: var(--text-tertiary); font-size: 24px; line-height: 1; cursor: pointer; }
-    .ml-photo { width: 100%; max-height: 240px; object-fit: cover; border-radius: 14px; margin-bottom: 12px; display: block; }
-    .ml-in { width: 100%; padding: 11px 12px; border-radius: 11px; border: 1px solid var(--border-strong); background: var(--bg-input); color: var(--text-primary); font-family: inherit; font-size: 14px; outline: none; }
-    .ml-in:focus { border-color: rgba(107,227,164,0.5); }
-    textarea.ml-in { resize: vertical; min-height: 64px; }
-    .ml-row2 { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 10px; }
-    .ml-hint { font-size: 11.5px; color: var(--text-tertiary); margin-top: 6px; line-height: 1.45; }
-    .ml-hint a { color: var(--text-secondary); }
-    .ml-loading { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 26px 0; color: var(--text-secondary); font-size: 13px; }
-    .ml-spin { width: 30px; height: 30px; border-radius: 50%; border: 3px solid rgba(255,255,255,0.1); border-top-color: #6BE3A4; animation: mlspin 0.9s linear infinite; }
-    @keyframes mlspin { to { transform: rotate(360deg); } }
-    .ml-err { background: rgba(255,107,107,0.08); border: 1px solid rgba(255,107,107,0.28); color: #FF8A8A; padding: 10px 12px; border-radius: 10px; font-size: 12.5px; margin: 10px 0; word-break: break-word; }
-    .ml-tot { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 12px 0; }
-    .ml-tot div { background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 11px; padding: 9px 4px; text-align: center; }
-    .ml-tot b { display: block; font-size: 17px; color: var(--text-primary); font-variant-numeric: tabular-nums; }
-    .ml-tot span { font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-tertiary); font-weight: 700; }
-    .ml-conf { font-size: 11.5px; color: var(--text-tertiary); margin-bottom: 8px; line-height: 1.45; }
-    .ml-item { border: 1px solid var(--border); border-radius: 13px; padding: 10px; margin-bottom: 8px; background: rgba(255,255,255,0.02); }
-    .ml-item-top { display: grid; grid-template-columns: 1fr 86px 28px; gap: 6px; align-items: center; }
-    .ml-item-top .ml-in { padding: 8px 10px; font-size: 13.5px; }
-    .ml-g { position: relative; }
-    .ml-g .ml-in { padding-right: 22px; text-align: right; }
-    .ml-g span { position: absolute; right: 9px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--text-tertiary); pointer-events: none; }
-    .ml-del { background: none; border: 0; color: var(--text-tertiary); font-size: 18px; cursor: pointer; }
-    .ml-item-macros { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 7px; }
-    .ml-item-macros label { font-size: 9.5px; color: var(--text-tertiary); letter-spacing: 0.08em; text-transform: uppercase; font-weight: 700; }
-    .ml-item-macros .ml-in { padding: 6px 8px; font-size: 13px; margin-top: 3px; font-variant-numeric: tabular-nums; }
-    .ml-portion { font-size: 11px; color: var(--text-tertiary); margin-top: 6px; font-style: italic; }
-    .ml-slots { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 12px; }
-    .ml-slot { padding: 6px 11px; border-radius: 999px; border: 1px solid var(--border-strong); background: none; color: var(--text-secondary); font-family: inherit; font-size: 12px; cursor: pointer; }
-    .ml-slot.on { background: rgba(107,227,164,0.14); border-color: rgba(107,227,164,0.5); color: #9BF2C4; }
-    .ml-sheet-actions { display: grid; grid-template-columns: auto 1fr; gap: 8px; margin-top: 14px; }
-    .ml-danger { padding: 13px 14px; border-radius: 13px; border: 1px solid rgba(255,138,138,0.3); background: none; color: #FF8A8A; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
-    .ml-goal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .ml-goal-grid label { font-size: 11px; color: var(--text-tertiary); font-weight: 600; }
-    .ml-goal-grid .ml-in { margin-top: 4px; }
-    @media (max-width: 440px) {
-      .ml-top { grid-template-columns: 112px 1fr; gap: 14px; }
-      .ml-ring { width: 112px; height: 112px; }
-      .ml-ring-num b { font-size: 25px; }
-      .ml-item-macros { grid-template-columns: repeat(2, 1fr); }
-    }
+    .fu-sheet-bg { position: fixed; inset: 0; z-index: 200; background: rgba(2,8,6,0.66); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); display: none; align-items: flex-end; justify-content: center; }
+    .fu-sheet-bg.open { display: flex; }
+    .fu-sheet { width: 100%; max-width: 560px; max-height: 92vh; overflow-y: auto; background: linear-gradient(180deg, #0F1A16, #0A110E); border: 1px solid var(--line-2); border-bottom: 0; border-radius: 24px 24px 0 0; padding: 20px 20px calc(20px + env(safe-area-inset-bottom)); color: var(--dim); }
+    @media (min-width: 640px) { .fu-sheet-bg { align-items: center; } .fu-sheet { border-radius: 24px; border-bottom: 1px solid var(--line-2); } }
+    .fu-sheet-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .fu-sheet-title { font-family: var(--serif); font-style: italic; font-size: 30px; color: var(--ink); line-height: 1; }
+    .fu-x { background: none; border: 0; color: var(--mute); font-size: 26px; line-height: 1; cursor: pointer; }
+    .fu-photo { width: 100%; max-height: 240px; object-fit: cover; border-radius: 16px; margin-bottom: 12px; display: block; border: 1px solid var(--line); }
+    .fu-in { width: 100%; padding: 12px 13px; border-radius: 12px; border: 1px solid var(--line-2); background: rgba(0,0,0,0.3); color: var(--ink); font-family: inherit; font-size: 14.5px; outline: none; box-sizing: border-box; }
+    .fu-in:focus { border-color: rgba(134,239,192,0.5); }
+    textarea.fu-in { resize: vertical; min-height: 70px; }
+    .fu-hint { font-size: 12px; color: var(--mute); margin: 8px 0; line-height: 1.5; }
+    .fu-btn { width: 100%; margin-top: 10px; padding: 15px; border-radius: 14px; border: 0; background: linear-gradient(180deg, #A3F5CF, #6FDDA9); color: #052417; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
+    .fu-btn.ghost { background: rgba(255,255,255,0.04); border: 1px solid var(--line-2); color: var(--ink); }
+    .fu-btn.danger { background: none; border: 1px solid rgba(255,138,138,0.35); color: #FF9A9A; }
+    .fu-loading { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 30px 0; font-size: 13.5px; }
+    .fu-spin { width: 32px; height: 32px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.08); border-top-color: var(--mint); animation: fuspin 0.9s linear infinite; }
+    @keyframes fuspin { to { transform: rotate(360deg); } }
+    .fu-err { background: rgba(255,107,107,0.08); border: 1px solid rgba(255,107,107,0.28); color: #FF9A9A; padding: 10px 12px; border-radius: 11px; font-size: 13px; margin-bottom: 12px; word-break: break-word; }
+    .fu-tot { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 14px 0; }
+    .fu-tot div { border: 1px solid var(--line); border-radius: 12px; padding: 10px 4px; text-align: center; background: rgba(255,255,255,0.02); }
+    .fu-tot b { display: block; font-family: var(--serif); font-size: 26px; font-weight: 400; color: var(--ink); line-height: 1; }
+    .fu-tot span { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--mute); }
+    .fu-conf { font-size: 12.5px; margin-bottom: 10px; line-height: 1.5; }
+    .fu-conf b { color: var(--ink); font-weight: 600; }
+    .fu-item { border: 1px solid var(--line); border-radius: 14px; padding: 10px; margin-bottom: 8px; background: rgba(255,255,255,0.02); }
+    .fu-item-top { display: grid; grid-template-columns: 1fr 88px 28px; gap: 6px; align-items: center; }
+    .fu-item-top .fu-in { padding: 9px 10px; font-size: 14px; }
+    .fu-g { position: relative; }
+    .fu-g .fu-in { padding-right: 22px; text-align: right; }
+    .fu-g span { position: absolute; right: 9px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--mute); pointer-events: none; }
+    .fu-del { background: none; border: 0; color: var(--mute); font-size: 20px; cursor: pointer; }
+    .fu-item-mac { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 8px; }
+    .fu-item-mac label { font-family: var(--font-mono); font-size: 9px; color: var(--mute); letter-spacing: 0.14em; text-transform: uppercase; }
+    .fu-item-mac .fu-in { padding: 7px 8px; font-size: 13.5px; margin-top: 3px; font-variant-numeric: tabular-nums; }
+    .fu-portion { font-size: 11.5px; color: var(--mute); margin-top: 6px; font-style: italic; }
+    .fu-slots { display: flex; gap: 6px; flex-wrap: wrap; margin: 12px 0 2px; align-items: center; }
+    .fu-slot { padding: 7px 12px; border-radius: 999px; border: 1px solid var(--line-2); background: none; color: var(--dim); font-family: inherit; font-size: 12.5px; cursor: pointer; }
+    .fu-slot.on { background: rgba(134,239,192,0.12); border-color: rgba(134,239,192,0.5); color: var(--mint); }
+    .fu-star { margin-left: auto; background: none; border: 1px solid var(--line-2); border-radius: 999px; padding: 7px 12px; color: var(--dim); font-family: inherit; font-size: 12.5px; cursor: pointer; }
+    .fu-star.on { color: #F2C063; border-color: rgba(242,192,99,0.5); background: rgba(242,192,99,0.08); }
+    .fu-row2 { display: grid; grid-template-columns: auto 1fr; gap: 8px; margin-top: 14px; }
+    .fu-row2 .fu-btn { margin-top: 0; width: auto; padding: 14px 18px; }
+    .fu-row2 .fu-btn:last-child { width: 100%; }
+    .fu-drinks { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .fu-drink { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 13px 14px; border-radius: 13px; border: 1px solid var(--line); background: rgba(255,255,255,0.025); color: var(--ink); font-family: inherit; font-size: 14px; cursor: pointer; text-align: left; }
+    .fu-drink:hover { border-color: rgba(134,239,192,0.35); }
+    .fu-drink em { font-style: normal; font-family: var(--font-mono); font-size: 11px; color: var(--mute); white-space: nowrap; }
+    .fu-goal-tabs { margin-bottom: 14px; }
+    .fu-goal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .fu-goal-grid label { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--mute); }
+    .fu-goal-grid .fu-in { margin-top: 5px; }
+    .fu-toast { position: fixed; left: 50%; bottom: calc(86px + env(safe-area-inset-bottom)); transform: translate(-50%, 20px); opacity: 0; z-index: 210; display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-radius: 14px; background: #13201B; border: 1px solid var(--line-2); color: var(--ink); font-size: 14px; box-shadow: 0 18px 40px rgba(0,0,0,0.5); transition: opacity 0.2s, transform 0.2s; pointer-events: none; max-width: calc(100vw - 32px); }
+    .fu-toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+    .fu-toast button { background: none; border: 0; color: var(--mint); font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; cursor: pointer; }
   </style>
 
-  <div class="ml-section" id="meals">
-    <div class="section-title">Food & Macros</div>
-    <div class="ml-card">
-      <div class="ml-daybar">
-        <button class="ml-daybtn" id="mlPrev" type="button" aria-label="Previous day">‹</button>
-        <div class="ml-day"><b id="mlDayName">Today</b><span id="mlDayDate">—</span></div>
-        <button class="ml-daybtn" id="mlNext" type="button" aria-label="Next day">›</button>
+  <div class="fu" id="meals">
+    <header class="fu-head">
+      <div class="fu-mono">Fuel · Macros</div>
+      <div class="fu-title-row"><h1 class="fu-title" id="fuTitle">Today's fuel</h1><span class="fu-pill idle" id="fuStatus">—</span></div>
+      <div class="fu-bar-row">
+        <span class="fu-mono fu-date" id="fuDate">—</span>
+        <button class="fu-arrow" id="fuPrev" type="button" aria-label="Previous day">‹</button>
+        <button class="fu-arrow" id="fuNext" type="button" aria-label="Next day">›</button>
+        <div class="fu-seg" id="fuType"><button type="button" data-t="gym">Gym day</button><button type="button" data-t="rest">Rest day</button></div>
+        <span class="fu-streak" id="fuStreak" hidden></span>
       </div>
-      <div class="ml-top">
-        <div class="ml-ring">
-          <svg viewBox="0 0 132 132"><circle cx="66" cy="66" r="56" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="11"/>
-            <circle id="mlRing" cx="66" cy="66" r="56" fill="none" stroke="#6BE3A4" stroke-width="11" stroke-linecap="round" stroke-dasharray="351.86" stroke-dashoffset="351.86" style="transition: stroke-dashoffset 0.7s cubic-bezier(0.22,1,0.36,1), stroke 0.3s"/></svg>
-          <div class="ml-ring-num"><b id="mlKcal">0</b><span>kcal</span><small id="mlKcalLeft">—</small></div>
+    </header>
+
+    <div class="fu-card fu-tip" id="fuTip" hidden>
+      <ol>
+        <li><b>Snap a photo.</b> Claude finds the foods and estimates the portions.</li>
+        <li><b>Or add by name.</b> Describe what you ate, then adjust the amounts.</li>
+        <li><b>Or skip the photo.</b> Use Quick drink, tap a Recent food, or scan a barcode.</li>
+      </ol>
+      <button type="button" id="fuTipDone">Got it</button>
+    </div>
+
+    <div class="fu-sec"><i>·01</i><span>Today</span></div>
+    <div class="fu-today">
+      <div class="fu-card fu-cal">
+        <div class="fu-cal-label">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2c1 3.5 5 6 5 11a5 5 0 0 1-10 0c0-2.4 1.2-4 2.5-5.2.3 1.6 1 2.7 2.5 3.2-.6-3.3-.6-6 0-9z"/></svg>
+          <span class="fu-mono" style="color:var(--dim)">Calories</span>
         </div>
-        <div class="ml-macros" id="mlMacros"></div>
+        <div class="fu-cal-num" id="fuCalNum"><b id="fuLeft">—</b><span id="fuLeftLbl">KCAL<br>LEFT</span></div>
+        <div class="fu-track"><div class="fu-fill" id="fuFill" style="width:0%"></div></div>
+        <div class="fu-cal-foot"><span><b id="fuEaten">0</b>eaten</span><span><b id="fuGoal">—</b>goal</span></div>
       </div>
-      <div class="ml-actions">
-        <button class="ml-snap" id="mlSnap" type="button">📸 Snap a meal</button>
-        <button class="ml-ghost" id="mlDescribe" type="button">✍️ Describe</button>
-      </div>
-      <input type="file" id="mlFile" accept="image/*" hidden>
+      <div class="fu-card fu-mac" id="fuMacros"></div>
     </div>
 
-    <div class="ml-card">
-      <div class="ml-subhead"><span class="ml-eyebrow" id="mlListTitle">Meals</span><span class="ml-eyebrow" id="mlListCount"></span></div>
-      <div class="ml-list" id="mlList"></div>
-    </div>
+    <div class="fu-chips" id="fuRecent" hidden></div>
+    <div class="fu-chips" id="fuFavs" hidden></div>
 
-    <div class="ml-card">
-      <div class="ml-subhead"><span class="ml-eyebrow">Last 7 days</span><button class="ml-link" id="mlGoalsBtn" type="button">Edit goals</button></div>
-      <div class="ml-week" id="mlWeek"></div>
-      <div class="ml-wk-sum" id="mlWeekSum"></div>
+    <button class="fu-snap" id="fuSnap" type="button">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/></svg>
+      Snap a meal
+    </button>
+    <div class="fu-tools">
+      <button class="fu-tool" id="fuAdd" type="button"><span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#86EFC0" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4-4"/></svg></span>Add food</button>
+      <button class="fu-tool" id="fuDrink" type="button"><span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A9C7E6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9h11v6a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5V9z"/><path d="M16 11h1.5a2.5 2.5 0 0 1 0 5H16M8 3v3M11 3v3M14 3v3"/></svg></span>Quick drink</button>
+      <button class="fu-tool" id="fuScan" type="button"><span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F2C063" stroke-width="2" stroke-linecap="round"><path d="M4 6v12M7 6v12M10.5 6v12M13 6v12M16.5 6v12M20 6v12"/></svg></span>Scan</button>
+    </div>
+    <input type="file" id="fuFile" accept="image/*" hidden>
+    <input type="file" id="fuBarcodeFile" accept="image/*" capture="environment" hidden>
+
+    <div class="fu-sec" style="margin-top:34px"><i>·02</i><span id="fuMealsTitle">Meals</span></div>
+    <div class="fu-card fu-meals" id="fuList" style="margin-top:0"></div>
+
+    <div class="fu-sec" style="margin-top:34px"><i>·03</i><span>Last 7 days</span><button class="fu-link" id="fuGoalsBtn" type="button">Edit goals</button></div>
+    <div class="fu-card fu-week" style="margin-top:0">
+      <div class="fu-wk" id="fuWeek"></div>
+      <div class="fu-wk-sum" id="fuWeekSum"></div>
     </div>
   </div>
 
-  <div class="ml-sheet-bg" id="mlSheetBg">
-    <div class="ml-sheet" role="dialog" aria-modal="true" aria-labelledby="mlSheetTitle">
-      <div class="ml-sheet-head"><span class="ml-sheet-title" id="mlSheetTitle">Log meal</span><button class="ml-x" id="mlClose" type="button" aria-label="Close">×</button></div>
-      <div id="mlSheetBody"></div>
+  <div class="fu-sheet-bg fu" id="fuSheetBg">
+    <div class="fu-sheet" role="dialog" aria-modal="true" aria-labelledby="fuSheetTitle">
+      <div class="fu-sheet-head"><span class="fu-sheet-title" id="fuSheetTitle">Log meal</span><button class="fu-x" id="fuClose" type="button" aria-label="Close">×</button></div>
+      <div id="fuSheetBody"></div>
     </div>
   </div>
+  <div class="fu-toast fu" id="fuToast" role="status"><span id="fuToastMsg"></span><button type="button" id="fuToastUndo">Undo</button></div>
 
   <script>
   (function () {
     'use strict';
-    const DAY_PREFIX = 'meals:day:';
-    const GOALS_KEY = 'meals:goals';
-    const THUMBS_KEY = 'meals:thumbs';
+    const DAY_PREFIX = 'meals:day:', TYPE_PREFIX = 'meals:type:';
+    const GOALS_KEY = 'meals:goals', FAVS_KEY = 'meals:favs', THUMBS_KEY = 'meals:thumbs', TIP_KEY = 'meals:tipDone';
     const NOVA_KEY = 'nova_lite_api_key';
     const MODEL = 'claude-opus-5-5';
-    const COLORS = { p: '#7DD3FC', c: '#F2C063', f: '#F0A3C8' };
-    const NAMES = { p: 'Protein', c: 'Carbs', f: 'Fat' };
     const SLOTS = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
+    const MAC = [
+      { k: 'p', name: 'Protein', color: 'var(--p)', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#86EFC0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12c3-4 7-5 11-3l4-3v12l-4-3c-4 2-8 1-11-3z"/><circle cx="8" cy="11.5" r="0.6" fill="#86EFC0"/></svg>' },
+      { k: 'c', name: 'Carbs', color: 'var(--c)', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#A9C7E6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V8M12 8c-2-1-3-3-2-5 2 1 3 3 2 5zm0 0c2-1 3-3 2-5-2 1-3 3-2 5zM12 13c-2.5 0-4-1.5-4-4 2.5 0 4 1.5 4 4zm0 0c2.5 0 4-1.5 4-4-2.5 0-4 1.5-4 4z"/></svg>' },
+      { k: 'f', name: 'Fat', color: 'var(--f)', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F2C063" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/></svg>' },
+    ];
+    const DRINKS = [
+      ['Water', '', 0, 0, 0, 0, 500], ['Black coffee', '12 oz', 5, 0.3, 0, 0, 355], ['Latte', '16 oz, 2% milk', 190, 13, 18, 7, 473],
+      ['Cold brew w/ cream', '16 oz', 80, 1, 1, 8, 473], ['Protein shake', '1 scoop + water', 130, 25, 4, 2, 350], ['Protein shake + milk', '1 scoop + 1 cup 2%', 250, 33, 16, 7, 300],
+      ['Milk, 2%', '1 cup', 122, 8, 12, 5, 244], ['Orange juice', '8 oz', 110, 2, 26, 0, 248], ['Coca-Cola', '12 oz can', 140, 0, 39, 0, 355],
+      ['Diet soda', '12 oz can', 0, 0, 0, 0, 355], ['Gatorade', '20 oz', 140, 0, 36, 0, 591], ['Energy drink', '16 oz', 220, 0, 54, 0, 473],
+      ['Celsius / zero-sugar energy', '12 oz', 10, 0, 2, 0, 355], ['Beer', '12 oz', 150, 2, 13, 0, 355], ['Wine', '5 oz glass', 125, 0, 4, 0, 150], ['Smoothie', '16 oz', 280, 6, 60, 3, 473],
+    ];
     const $ = (id) => document.getElementById(id);
     const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
     const readLS = (k, f) => { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? f : v; } catch { return f; } };
     const writeLS = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } };
+    const removeLS = (k) => { try { localStorage.removeItem(k); } catch {} };
     const r0 = (n) => Math.round(Number(n) || 0);
     const r1 = (n) => Math.round((Number(n) || 0) * 10) / 10;
 
     function dayKey(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
     function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
-    let viewDate = new Date(); viewDate.setHours(12, 0, 0, 0);
+    function noon(d) { const x = new Date(d); x.setHours(12, 0, 0, 0); return x; }
+    let viewDate = noon(new Date());
     const isToday = () => dayKey(viewDate) === dayKey(new Date());
 
-    function goals() { return Object.assign({ kcal: 2600, p: 200, c: 260, f: 80 }, readLS(GOALS_KEY, {})); }
-    function mealsFor(k) { return readLS(DAY_PREFIX + k, []); }
-    function saveMeals(k, arr) {
-      if (arr.length) writeLS(DAY_PREFIX + k, arr);
-      else try { localStorage.removeItem(DAY_PREFIX + k); } catch {}
+    // ---------- Data ----------
+    // Goals were a single {kcal,p,c,f} before gym/rest days existed; treat that as the gym goal.
+    function allGoals() {
+      const raw = readLS(GOALS_KEY, {});
+      const gym = Object.assign({ kcal: 2900, p: 200, c: 340, f: 85 }, raw.gym || (raw.kcal ? raw : {}));
+      const rest = Object.assign({ kcal: gym.kcal - 400, p: gym.p, c: Math.max(0, gym.c - 100), f: gym.f }, raw.rest || {});
+      return { gym, rest };
     }
+    // Lifted that day (Lyfta cache or the overload coach's logs) → gym day, unless overridden.
+    function trainedOn(k) {
+      const ly = (readLS('lyfta_cache_v1', {}).workouts) || [];
+      if (ly.some((w) => dayKey(new Date(w.workout_perform_date)) === k)) return true;
+      const coach = readLS('po_coach_v1', {});
+      return Object.values(coach.logs || {}).some((arr) => (arr || []).some((l) => l.date && dayKey(new Date(l.date)) === k));
+    }
+    function dayType(k) { const t = readLS(TYPE_PREFIX + k, null); return t === 'gym' || t === 'rest' ? t : trainedOn(k) ? 'gym' : 'rest'; }
+    function goalsFor(k) { return allGoals()[dayType(k)]; }
+    function mealsFor(k) { return readLS(DAY_PREFIX + k, []); }
+    function saveMeals(k, arr) { if (arr.length) writeLS(DAY_PREFIX + k, arr); else removeLS(DAY_PREFIX + k); }
     function totals(items) {
       return items.reduce((t, i) => ({ kcal: t.kcal + (+i.kcal || 0), p: t.p + (+i.p || 0), c: t.c + (+i.c || 0), f: t.f + (+i.f || 0), fib: t.fib + (+i.fib || 0) }), { kcal: 0, p: 0, c: 0, f: 0, fib: 0 });
     }
@@ -701,89 +820,165 @@ main {
       if (ids.length > 120) ids.slice(0, ids.length - 120).forEach((x) => delete t[x]);
       if (!writeLS(THUMBS_KEY, t)) { const ks = Object.keys(t); ks.slice(0, Math.ceil(ks.length / 2)).forEach((x) => delete t[x]); writeLS(THUMBS_KEY, t); }
     }
+    function favs() { return readLS(FAVS_KEY, []); }
     function slotFor(date) { const h = date.getHours(); return h < 11 ? 'Breakfast' : h < 16 ? 'Lunch' : h < 21 ? 'Dinner' : 'Snack'; }
-
-    // ---------- Main render ----------
-    function render() {
-      const k = dayKey(viewDate), g = goals(), t = dayTotals(k);
-      const today = new Date();
-      $('mlDayName').textContent = isToday() ? 'Today' : dayKey(addDays(today, -1)) === k ? 'Yesterday' : viewDate.toLocaleDateString(undefined, { weekday: 'long' });
-      $('mlDayDate').textContent = viewDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-      $('mlNext').disabled = isToday();
-      const C = 351.86, frac = Math.min(1, t.kcal / g.kcal);
-      $('mlRing').style.strokeDashoffset = String(C * (1 - frac));
-      $('mlRing').style.stroke = t.kcal > g.kcal * 1.05 ? '#FF8A4D' : '#6BE3A4';
-      $('mlKcal').textContent = r0(t.kcal).toLocaleString();
-      const left = r0(g.kcal - t.kcal);
-      $('mlKcalLeft').textContent = left >= 0 ? left.toLocaleString() + ' left' : Math.abs(left).toLocaleString() + ' over';
-      $('mlMacros').innerHTML = ['p', 'c', 'f'].map((m) =>
-        '<div><div class="ml-macro-head"><span>' + NAMES[m] + '</span><b>' + r0(t[m]) + '<em> / ' + g[m] + 'g</em></b></div>'
-        + '<div class="ml-bar"><i style="width:' + Math.min(100, 100 * t[m] / g[m]) + '%;background:' + COLORS[m] + '"></i></div></div>').join('')
-        + (t.fib ? '<div style="font-size:11px;color:var(--text-tertiary);font-family:var(--font-mono)">fiber ' + r0(t.fib) + 'g</div>' : '');
-      renderList(k);
-      renderWeek();
+    function newId() { return 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+    function blankItem() { return { name: '', portion: '', g: 0, kcal: 0, p: 0, c: 0, f: 0, fib: 0 }; }
+    // Meals logged while browsing a past day land on that day at the current clock time.
+    function mealTime() { const now = new Date(), d = new Date(viewDate); d.setHours(now.getHours(), now.getMinutes(), 0, 0); return d.toISOString(); }
+    function newMeal(name, items, extra) { const t = new Date(mealTime()); return Object.assign({ id: newId(), time: t.toISOString(), slot: slotFor(t), name: name || 'Meal', items }, extra || {}); }
+    function streak() {
+      let d = new Date(), n = 0;
+      if (!mealsFor(dayKey(d)).length) d = addDays(d, -1);
+      while (mealsFor(dayKey(d)).length && n < 999) { n++; d = addDays(d, -1); }
+      return n;
     }
+
+    // ---------- Render ----------
+    function render() {
+      const k = dayKey(viewDate), g = goalsFor(k), t = dayTotals(k), type = dayType(k);
+      const yest = dayKey(addDays(new Date(), -1)) === k;
+      $('fuTitle').textContent = isToday() ? "Today's fuel" : yest ? "Yesterday's fuel" : viewDate.toLocaleDateString(undefined, { weekday: 'long' }) + "'s fuel";
+      $('fuDate').textContent = viewDate.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+      $('fuNext').disabled = isToday();
+      $('fuType').querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.t === type));
+      const st = streak();
+      $('fuStreak').hidden = st < 2; $('fuStreak').textContent = st + ' day streak';
+
+      const status = $('fuStatus');
+      const over = t.kcal > g.kcal * 1.05;
+      // Pace: by now you'd expect roughly (hour-7)/14 of the day's calories eaten.
+      const pace = isToday() ? Math.min(1, Math.max(0.15, (new Date().getHours() - 7) / 14)) : 1;
+      if (!t.kcal) { status.className = 'fu-pill idle'; status.textContent = isToday() ? 'Not started' : 'Nothing logged'; }
+      else if (over) { status.className = 'fu-pill over'; status.textContent = 'Over'; }
+      else if (!isToday() && t.kcal < g.kcal * 0.85) { status.className = 'fu-pill over'; status.textContent = 'Under'; }
+      else if (t.p < g.p * pace * 0.7) { status.className = 'fu-pill over'; status.textContent = 'Low protein'; }
+      else { status.className = 'fu-pill'; status.textContent = 'On track'; }
+
+      const left = r0(g.kcal - t.kcal);
+      $('fuLeft').textContent = Math.abs(left).toLocaleString();
+      $('fuLeftLbl').innerHTML = left >= 0 ? 'KCAL<br>LEFT' : 'KCAL<br>OVER';
+      $('fuCalNum').classList.toggle('over', left < 0);
+      $('fuFill').style.width = Math.min(100, 100 * t.kcal / g.kcal) + '%';
+      $('fuFill').classList.toggle('over', over);
+      $('fuEaten').textContent = r0(t.kcal).toLocaleString();
+      $('fuGoal').textContent = g.kcal.toLocaleString();
+      $('fuMacros').innerHTML = MAC.map((m) => {
+        const pct = g[m.k] ? Math.round(100 * t[m.k] / g[m.k]) : 0;
+        return '<div class="fu-mrow"><div class="fu-ico">' + m.icon + '</div><div>'
+          + '<div class="fu-mhead"><span class="fu-mono">' + m.name + '</span><b>' + r0(t[m.k]) + '<em> / ' + g[m.k] + ' g</em></b></div>'
+          + '<div class="fu-mbar"><i style="width:' + Math.min(100, pct) + '%;background:' + m.color + '"></i></div></div>'
+          + '<div class="fu-pct" style="color:' + m.color + '">' + pct + '%</div></div>';
+      }).join('');
+      renderChips(); renderList(k); renderWeek();
+    }
+
+    function chipRow(el, label, entries, onPick) {
+      el.hidden = !entries.length;
+      if (!entries.length) return;
+      el.innerHTML = '<span class="fu-mono">' + label + '</span>' + entries.map((e, i) => '<button class="fu-chip" type="button" data-i="' + i + '">' + esc(e.label) + '<em>· ' + r0(e.kcal) + '</em></button>').join('');
+      el.querySelectorAll('.fu-chip').forEach((b) => b.addEventListener('click', () => onPick(entries[Number(b.dataset.i)])));
+    }
+    function renderChips() {
+      // Recent: distinct foods from the last 14 days, newest first.
+      const seen = new Set(), recent = [];
+      for (let i = 0; i < 14 && recent.length < 12; i++) {
+        const meals = mealsFor(dayKey(addDays(new Date(), -i))).slice().sort((a, b) => (a.time < b.time ? 1 : -1));
+        meals.forEach((m) => (m.items || []).forEach((it) => {
+          const key = String(it.name || '').toLowerCase().trim();
+          if (!key || seen.has(key) || recent.length >= 12) return;
+          seen.add(key); recent.push({ label: it.name, kcal: it.kcal, item: it });
+        }));
+      }
+      chipRow($('fuRecent'), 'Recent', recent, (e) => openEditor(newMeal(e.item.name, [Object.assign({}, e.item)]), dayKey(viewDate), true));
+      chipRow($('fuFavs'), 'Favorites', favs().map((f) => ({ label: f.name, kcal: totals(f.items || []).kcal, fav: f })), (e) => {
+        const m = newMeal(e.fav.name, JSON.parse(JSON.stringify(e.fav.items || [])), { fav: true });
+        openEditor(m, dayKey(viewDate), true, thumbs()[e.fav.id]);
+      });
+    }
+
     function renderList(k) {
       const meals = mealsFor(k).slice().sort((a, b) => (a.time < b.time ? -1 : 1));
       const th = thumbs();
-      $('mlListTitle').textContent = isToday() ? "Today's meals" : 'Meals';
-      $('mlListCount').textContent = meals.length ? meals.length + ' logged' : '';
-      $('mlList').innerHTML = meals.length ? meals.map((m) => {
+      $('fuMealsTitle').textContent = (isToday() ? "Today's meals" : 'Meals') + (meals.length ? ' · ' + meals.length : '');
+      $('fuList').innerHTML = meals.length ? meals.map((m) => {
         const t = totals(m.items || []);
         const time = new Date(m.time).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-        return '<div class="ml-meal" data-id="' + esc(m.id) + '">'
-          + (th[m.id] ? '<img class="ml-thumb" src="' + th[m.id] + '" alt="">' : '<div class="ml-thumb">' + (m.photo ? '📷' : '🍽️') + '</div>')
-          + '<div class="ml-meal-main"><div class="ml-meal-name">' + esc(m.name || 'Meal') + '</div>'
-          + '<div class="ml-meal-meta">' + esc(m.slot || '') + ' · ' + time + ' · P' + r0(t.p) + ' C' + r0(t.c) + ' F' + r0(t.f) + '</div></div>'
-          + '<div class="ml-meal-kcal">' + r0(t.kcal) + '<small>KCAL</small></div></div>';
-      }).join('') : '<div class="ml-empty">' + (isToday() ? 'Nothing logged yet today.<br>Snap a photo of your next meal.' : 'Nothing logged this day.') + '</div>';
-      $('mlList').querySelectorAll('.ml-meal').forEach((el) => el.addEventListener('click', () => {
+        return '<div class="fu-meal" data-id="' + esc(m.id) + '">'
+          + (th[m.id] ? '<img class="fu-thumb" src="' + th[m.id] + '" alt="">' : '<div class="fu-thumb">' + (m.drink ? '🥤' : m.photo ? '📷' : '🍽️') + '</div>')
+          + '<div class="fu-meal-main"><div class="fu-meal-name">' + esc(m.name || 'Meal') + '</div>'
+          + '<div class="fu-meal-meta">' + esc((m.slot || '').toUpperCase()) + ' · ' + time + ' · <i class="p">P' + r0(t.p) + '</i> <i class="c">C' + r0(t.c) + '</i> <i class="f">F' + r0(t.f) + '</i></div></div>'
+          + '<div class="fu-meal-kcal">' + r0(t.kcal) + '<small>KCAL</small></div></div>';
+      }).join('') : '<div class="fu-empty"><b>' + (isToday() ? 'Nothing yet today' : 'Nothing logged') + '</b>' + (isToday() ? 'Snap your next meal to start.' : 'Use the arrows to browse other days.') + '</div>';
+      $('fuList').querySelectorAll('.fu-meal').forEach((el) => el.addEventListener('click', () => {
         const m = mealsFor(k).find((x) => x.id === el.dataset.id);
         if (m) openEditor(JSON.parse(JSON.stringify(m)), k, false);
       }));
     }
+
     function renderWeek() {
-      const g = goals(), days = [];
-      for (let i = 6; i >= 0; i--) { const d = addDays(new Date(), -i); days.push({ d, k: dayKey(d), t: dayTotals(dayKey(d)) }); }
-      const max = Math.max(g.kcal * 1.15, ...days.map((x) => x.t.kcal));
+      const days = [];
+      for (let i = 6; i >= 0; i--) { const d = addDays(new Date(), -i), k = dayKey(d); days.push({ d, k, t: dayTotals(k), g: goalsFor(k) }); }
+      const goalAvg = days.reduce((s, x) => s + x.g.kcal, 0) / 7;
+      const max = Math.max(goalAvg * 1.2, ...days.map((x) => x.t.kcal));
       const sel = dayKey(viewDate);
-      $('mlWeek').innerHTML = days.map((x) =>
-        '<div class="ml-wk-col' + (x.k === sel ? ' sel' : '') + '" data-k="' + x.k + '" title="' + r0(x.t.kcal) + ' kcal · ' + r0(x.t.p) + 'g protein">'
-        + '<div class="ml-wk-bar' + (!x.t.kcal ? ' empty' : x.t.kcal > g.kcal * 1.05 ? ' over' : '') + '" style="height:' + Math.max(3, 92 * x.t.kcal / max) + 'px"></div>'
-        + '<div class="ml-wk-lbl">' + x.d.toLocaleDateString(undefined, { weekday: 'narrow' }) + '</div></div>').join('');
-      $('mlWeek').querySelectorAll('.ml-wk-col').forEach((el) => el.addEventListener('click', () => {
+      $('fuWeek').innerHTML = '<div class="fu-wk-goal" style="bottom:calc(' + (100 * goalAvg / max) + '% * 0.8 + 18px)"><span>GOAL</span></div>'
+        + days.map((x) => '<div class="fu-wk-col' + (x.k === sel ? ' sel' : '') + '" data-k="' + x.k + '" title="' + r0(x.t.kcal) + ' kcal · ' + r0(x.t.p) + 'g protein">'
+          + '<div class="fu-wk-bar' + (!x.t.kcal ? ' empty' : x.t.kcal > x.g.kcal * 1.05 ? ' over' : '') + '" style="height:calc(' + (100 * x.t.kcal / max) + '% * 0.8)"></div>'
+          + '<div class="fu-wk-lbl">' + x.d.toLocaleDateString(undefined, { weekday: 'short' }).slice(0, 2).toUpperCase() + '</div></div>').join('');
+      $('fuWeek').querySelectorAll('.fu-wk-col').forEach((el) => el.addEventListener('click', () => {
         const [y, m, d] = el.dataset.k.split('-').map(Number); viewDate = new Date(y, m - 1, d, 12); render();
       }));
       const logged = days.filter((x) => x.t.kcal > 0);
-      const avg = (f) => logged.length ? r0(logged.reduce((s, x) => s + x.t[f], 0) / logged.length) : '—';
-      const hit = logged.filter((x) => x.t.p >= g.p * 0.9).length;
-      $('mlWeekSum').innerHTML = '<div class="ml-wk-stat"><b>' + avg('kcal') + '</b><span>Avg kcal</span></div>'
-        + '<div class="ml-wk-stat"><b>' + avg('p') + (logged.length ? 'g' : '') + '</b><span>Avg protein</span></div>'
-        + '<div class="ml-wk-stat"><b>' + hit + '/' + logged.length + '</b><span>Protein goal</span></div>';
+      const avg = (f) => logged.length ? r0(logged.reduce((s, x) => s + x.t[f], 0) / logged.length).toLocaleString() : '—';
+      const hit = logged.filter((x) => x.t.p >= x.g.p * 0.9).length;
+      $('fuWeekSum').innerHTML = '<div><b>' + avg('kcal') + '</b><span class="fu-mono">Avg kcal</span></div>'
+        + '<div><b>' + avg('p') + (logged.length ? '<small style="font-size:16px">g</small>' : '') + '</b><span class="fu-mono">Avg protein</span></div>'
+        + '<div><b>' + hit + '<small style="font-size:16px;color:var(--mute)">/' + logged.length + '</small></b><span class="fu-mono">Protein hit</span></div>';
     }
-    $('mlPrev').addEventListener('click', () => { viewDate = addDays(viewDate, -1); render(); });
-    $('mlNext').addEventListener('click', () => { if (!isToday()) { viewDate = addDays(viewDate, 1); render(); } });
+
+    $('fuPrev').addEventListener('click', () => { viewDate = addDays(viewDate, -1); render(); });
+    $('fuNext').addEventListener('click', () => { if (!isToday()) { viewDate = addDays(viewDate, 1); render(); } });
+    $('fuType').addEventListener('click', (e) => {
+      const b = e.target.closest('button'); if (!b) return;
+      const k = dayKey(viewDate);
+      // Store only real overrides so auto-detection keeps working on other days.
+      if (b.dataset.t === (trainedOn(k) ? 'gym' : 'rest')) removeLS(TYPE_PREFIX + k); else writeLS(TYPE_PREFIX + k, b.dataset.t);
+      render();
+    });
+    if (!readLS(TIP_KEY, null)) $('fuTip').hidden = false;
+    $('fuTipDone').addEventListener('click', () => { writeLS(TIP_KEY, 1); $('fuTip').hidden = true; });
+
+    // ---------- Toast ----------
+    let toastTimer = null, undoFn = null;
+    function toast(msg, undo) {
+      $('fuToastMsg').textContent = msg; undoFn = undo || null;
+      $('fuToastUndo').hidden = !undo;
+      $('fuToast').classList.add('show');
+      clearTimeout(toastTimer); toastTimer = setTimeout(() => $('fuToast').classList.remove('show'), 4500);
+    }
+    $('fuToastUndo').addEventListener('click', () => { if (undoFn) undoFn(); undoFn = null; $('fuToast').classList.remove('show'); });
 
     // ---------- Sheet ----------
-    const sheetBg = $('mlSheetBg'), sheetBody = $('mlSheetBody');
-    function openSheet(title, html) { $('mlSheetTitle').textContent = title; sheetBody.innerHTML = html; sheetBg.classList.add('open'); document.body.style.overflow = 'hidden'; }
+    const sheetBg = $('fuSheetBg'), sheetBody = $('fuSheetBody');
+    function openSheet(title, html) { $('fuSheetTitle').textContent = title; sheetBody.innerHTML = html; sheetBg.classList.add('open'); document.body.style.overflow = 'hidden'; }
     function closeSheet() { sheetBg.classList.remove('open'); document.body.style.overflow = ''; }
-    $('mlClose').addEventListener('click', closeSheet);
+    $('fuClose').addEventListener('click', closeSheet);
     sheetBg.addEventListener('click', (e) => { if (e.target === sheetBg) closeSheet(); });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && sheetBg.classList.contains('open')) closeSheet(); });
 
     function apiKey() { try { return localStorage.getItem(NOVA_KEY) || ''; } catch { return ''; } }
     function keyField() {
-      return apiKey() ? '' : '<div class="ml-hint" style="margin-bottom:10px">Meal scanning uses your Anthropic API key (the same one Nova uses). Paste it once:</div>'
-        + '<input class="ml-in" id="mlKeyIn" type="password" placeholder="sk-ant-…" autocomplete="off" style="margin-bottom:10px">';
+      return apiKey() ? '' : '<div class="fu-hint">Photo and text estimates use your Anthropic API key (the same one Nova uses). Paste it once:</div>'
+        + '<input class="fu-in" id="fuKeyIn" type="password" placeholder="sk-ant-…" autocomplete="off" style="margin-bottom:10px">';
     }
     function takeKey() {
-      const el = $('mlKeyIn');
+      const el = $('fuKeyIn');
       if (el && el.value.trim()) { try { localStorage.setItem(NOVA_KEY, el.value.trim()); } catch {} }
       return apiKey();
     }
 
-    // Photo → compressed JPEG (for the API) + small thumbnail (for the list).
+    // Photo → compressed JPEG (for the API) + small square thumbnail (for the list).
     function loadImage(file) {
       return new Promise((res, rej) => {
         const url = URL.createObjectURL(file), img = new Image();
@@ -806,39 +1001,101 @@ main {
       return c.toDataURL('image/jpeg', 0.7);
     }
 
-    $('mlSnap').addEventListener('click', () => { $('mlFile').value = ''; $('mlFile').click(); });
-    $('mlFile').addEventListener('change', async () => {
-      const file = $('mlFile').files && $('mlFile').files[0];
+    // ---------- Snap / Add food ----------
+    $('fuSnap').addEventListener('click', () => { $('fuFile').value = ''; $('fuFile').click(); });
+    $('fuFile').addEventListener('change', async () => {
+      const file = $('fuFile').files && $('fuFile').files[0];
       if (!file) return;
       let img;
-      try { img = await loadImage(file); } catch (e) { openSheet('Log meal', '<div class="ml-err">' + esc(e.message) + '</div>'); return; }
+      try { img = await loadImage(file); } catch (e) { openSheet('Snap a meal', '<div class="fu-err">' + esc(e.message) + '</div>'); return; }
       const photo = toJpeg(img, 1280, 0.82), thumb = squareThumb(img);
-      openSheet('Snap a meal', '<img class="ml-photo" src="' + photo + '" alt="Meal photo">' + keyField()
-        + '<textarea class="ml-in" id="mlNote" placeholder="Optional: anything the photo can\'t show — e.g. cooked in butter, 2 tortillas, 8oz chicken"></textarea>'
-        + '<button class="ml-snap" id="mlGo" type="button" style="width:100%;margin-top:10px">Analyze meal</button>');
-      $('mlGo').addEventListener('click', () => analyze({ photo, thumb, note: $('mlNote').value.trim() }));
+      openSheet('Snap a meal', '<img class="fu-photo" src="' + photo + '" alt="Meal photo">' + keyField()
+        + '<textarea class="fu-in" id="fuNote" placeholder="Optional: anything the photo can\'t show — cooked in butter, 2 tortillas, 8 oz chicken"></textarea>'
+        + '<button class="fu-btn" id="fuGo" type="button">Analyze meal</button>');
+      $('fuGo').addEventListener('click', () => analyze({ photo, thumb, note: $('fuNote').value.trim() }));
     });
-    $('mlDescribe').addEventListener('click', () => {
-      openSheet('Describe a meal', keyField()
-        + '<textarea class="ml-in" id="mlNote" placeholder="e.g. Chipotle bowl: double chicken, white rice, black beans, fajita veggies, cheese, guac"></textarea>'
-        + '<button class="ml-snap" id="mlGo" type="button" style="width:100%;margin-top:10px">Estimate macros</button>'
-        + '<button class="ml-ghost" id="mlManual" type="button" style="width:100%;margin-top:8px">Enter numbers myself</button>');
-      $('mlGo').addEventListener('click', () => {
-        const note = $('mlNote').value.trim();
-        if (!note) { $('mlNote').focus(); return; }
-        analyze({ note });
-      });
-      $('mlManual').addEventListener('click', () => {
-        const now = new Date();
-        openEditor({ id: newId(), time: mealTime(now), slot: slotFor(now), name: $('mlNote').value.trim() || 'Meal', items: [blankItem()] }, dayKey(viewDate), true);
-      });
-    });
-    function newId() { return 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
-    function blankItem() { return { name: '', portion: '', g: 0, kcal: 0, p: 0, c: 0, f: 0, fib: 0 }; }
-    // Meals logged while browsing a past day land on that day at the current clock time.
-    function mealTime(now) { const d = new Date(viewDate); d.setHours(now.getHours(), now.getMinutes(), 0, 0); return d.toISOString(); }
+    function openAddFood(prefill, err) {
+      openSheet('Add food', (err ? '<div class="fu-err">' + esc(err) + '</div>' : '') + keyField()
+        + '<textarea class="fu-in" id="fuNote" placeholder="What did you eat? e.g. Chipotle bowl — double chicken, white rice, black beans, fajita veggies, cheese, guac">' + esc(prefill || '') + '</textarea>'
+        + '<button class="fu-btn" id="fuGo" type="button">Estimate macros</button>'
+        + '<button class="fu-btn ghost" id="fuManual" type="button">Enter numbers myself</button>');
+      $('fuGo').addEventListener('click', () => { const note = $('fuNote').value.trim(); if (!note) { $('fuNote').focus(); return; } analyze({ note }); });
+      $('fuManual').addEventListener('click', () => openEditor(newMeal($('fuNote').value.trim() || 'Meal', [blankItem()]), dayKey(viewDate), true));
+    }
+    $('fuAdd').addEventListener('click', () => openAddFood());
 
-    // ---------- Claude call ----------
+    // ---------- Quick drink ----------
+    $('fuDrink').addEventListener('click', () => {
+      openSheet('Quick drink', '<div class="fu-hint" style="margin-top:0">Tap to log instantly. Tap the meal later to change the size.</div><div class="fu-drinks">'
+        + DRINKS.map((d, i) => '<button class="fu-drink" type="button" data-i="' + i + '"><span>' + esc(d[0]) + '</span><em>' + d[2] + ' kcal</em></button>').join('') + '</div>');
+      sheetBody.querySelectorAll('.fu-drink').forEach((b) => b.addEventListener('click', () => {
+        const [name, portion, kcal, p, c, f, g] = DRINKS[Number(b.dataset.i)];
+        const k = dayKey(viewDate);
+        const m = newMeal(name, [{ name, portion, g, kcal, p, c, f, fib: 0 }], { drink: true });
+        m.slot = 'Snack';
+        saveMeals(k, mealsFor(k).concat([m]));
+        closeSheet(); render();
+        toast(name + ' added · ' + kcal + ' kcal', () => { saveMeals(k, mealsFor(k).filter((x) => x.id !== m.id)); render(); });
+      }));
+    });
+
+    // ---------- Barcode ----------
+    $('fuScan').addEventListener('click', () => {
+      openSheet('Scan a barcode', '<div class="fu-hint" style="margin-top:0">Take a close, sharp photo of the barcode on the package — or type the number underneath it.</div>'
+        + '<button class="fu-btn" id="fuBcPhoto" type="button">Take photo of barcode</button>'
+        + '<div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:14px"><input class="fu-in" id="fuBcNum" inputmode="numeric" placeholder="e.g. 012000161155"><button class="fu-btn ghost" id="fuBcGo" type="button" style="margin:0;width:auto;padding:0 18px">Look up</button></div>');
+      $('fuBcPhoto').addEventListener('click', () => { $('fuBarcodeFile').value = ''; $('fuBarcodeFile').click(); });
+      $('fuBcGo').addEventListener('click', () => { const v = $('fuBcNum').value.replace(/\D/g, ''); if (v.length >= 8) lookupBarcode(v); else $('fuBcNum').focus(); });
+    });
+    $('fuBarcodeFile').addEventListener('change', async () => {
+      const file = $('fuBarcodeFile').files && $('fuBarcodeFile').files[0];
+      if (!file) return;
+      sheetBody.innerHTML = '<div class="fu-loading"><div class="fu-spin"></div>Reading barcode…</div>';
+      try {
+        const img = await loadImage(file);
+        let code = '';
+        // Native detector where the browser has one (Chrome/Android); otherwise ask Claude to read the digits.
+        if ('BarcodeDetector' in window) {
+          try { const found = await new window.BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e'] }).detect(img); code = found[0] ? found[0].rawValue : ''; } catch {}
+        }
+        if (!code && apiKey()) {
+          const r = await callClaude([{ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: toJpeg(img, 1280, 0.9).split(',')[1] } },
+            { type: 'text', text: 'Read the product barcode number (UPC/EAN digits) in this photo. Return only digits; empty string if unreadable.' }],
+            'You read barcodes from photos.', { type: 'object', additionalProperties: false, required: ['barcode'], properties: { barcode: { type: 'string' } } }, 'low');
+          code = String(r.barcode || '').replace(/\D/g, '');
+        }
+        if (code.length < 8) throw new Error('Couldn\'t read the barcode. Try a closer photo, or type the number.');
+        lookupBarcode(code);
+      } catch (e) {
+        $('fuScan').click();
+        sheetBody.insertAdjacentHTML('afterbegin', '<div class="fu-err">' + esc(e.message || String(e)) + '</div>');
+      }
+    });
+    async function lookupBarcode(code) {
+      sheetBody.innerHTML = '<div class="fu-loading"><div class="fu-spin"></div>Looking up ' + esc(code) + '…</div>';
+      try {
+        const r = await fetch('https://world.openfoodfacts.org/api/v2/product/' + code + '.json?fields=product_name,brands,serving_size,serving_quantity,nutriments');
+        const j = await r.json();
+        if (j.status !== 1 || !j.product) throw new Error('Product ' + code + ' isn\'t in the Open Food Facts database. Use Add food instead.');
+        const pr = j.product, n = pr.nutriments || {};
+        const sq = parseFloat(pr.serving_quantity) || 0;
+        const per = (key) => {
+          if (sq && n[key + '_100g'] != null) return (+n[key + '_100g']) * sq / 100;
+          if (n[key + '_serving'] != null) return +n[key + '_serving'];
+          return +n[key + '_100g'] || 0;
+        };
+        const kcal = n['energy-kcal_100g'] != null || n['energy-kcal_serving'] != null ? per('energy-kcal') : per('energy') / 4.184;
+        const brand = (pr.brands || '').split(',')[0].trim(), pname = (pr.product_name || '').trim();
+        const name = (brand && !pname.toLowerCase().includes(brand.toLowerCase()) ? brand + ' ' : '') + pname || brand || 'Product ' + code;
+        const item = { name, portion: pr.serving_size || (sq ? sq + ' g' : '100 g'), g: r0(sq || 100), kcal: r0(kcal), p: r1(per('proteins')), c: r1(per('carbohydrates')), f: r1(per('fat')), fib: r1(per('fiber')) };
+        openEditor(newMeal(name, [item], { barcode: code }), dayKey(viewDate), true);
+      } catch (e) {
+        $('fuScan').click();
+        sheetBody.insertAdjacentHTML('afterbegin', '<div class="fu-err">' + esc(e.message || String(e)) + '</div>');
+      }
+    }
+
+    // ---------- Claude ----------
     const SYSTEM = 'You are a sports nutritionist estimating the nutrition of a meal for someone tracking macros. '
       + 'Identify every distinct food and drink, estimate each portion in grams (plus a household measure such as "1 cup" or "palm-sized"), '
       + 'and estimate calories, protein, carbohydrates, fat and fiber from standard nutrition data (USDA-style values for the food as served). '
@@ -861,12 +1118,9 @@ main {
         notes: { type: 'string' },
       },
     };
-    async function askClaude(photo, note) {
-      const key = takeKey();
-      if (!key) throw new Error('Add your Anthropic API key above first.');
-      const content = [];
-      if (photo) content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: photo.split(',')[1] } });
-      content.push({ type: 'text', text: (photo ? 'Estimate the nutrition of this meal.' : 'Estimate the nutrition of this meal from my description.') + (note ? '\n\nDetails from me: ' + note : '') });
+    async function callClaude(content, system, schema, effort) {
+      const key = apiKey();
+      if (!key) throw new Error('Add your Anthropic API key first.');
       const res = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -875,8 +1129,8 @@ main {
           'anthropic-beta': 'server-side-fallback-2026-07-01',
         },
         body: JSON.stringify({
-          model: MODEL, max_tokens: 16000, system: SYSTEM,
-          output_config: { effort: 'medium', format: { type: 'json_schema', schema: SCHEMA } },
+          model: MODEL, max_tokens: 16000, system,
+          output_config: { effort, format: { type: 'json_schema', schema } },
           fallbacks: 'default',
           messages: [{ role: 'user', content }],
         }),
@@ -892,61 +1146,58 @@ main {
       try { return JSON.parse(text); } catch { throw new Error('Could not read the estimate — try again.'); }
     }
     async function analyze({ photo, thumb, note }) {
-      if (!takeKey()) { const el = $('mlKeyIn'); if (el) el.focus(); return; }
-      const keep = sheetBody.innerHTML;
-      sheetBody.innerHTML = (photo ? '<img class="ml-photo" src="' + photo + '" alt="">' : '')
-        + '<div class="ml-loading"><div class="ml-spin"></div>Reading your meal… this takes 10–30 seconds</div>';
+      if (!takeKey()) { const el = $('fuKeyIn'); if (el) el.focus(); return; }
+      sheetBody.innerHTML = (photo ? '<img class="fu-photo" src="' + photo + '" alt="">' : '')
+        + '<div class="fu-loading"><div class="fu-spin"></div>Reading your meal… 10–30 seconds</div>';
       try {
-        const r = await askClaude(photo, note);
-        const now = new Date();
-        const meal = {
-          id: newId(), time: mealTime(now), slot: slotFor(now), name: r.meal_name || 'Meal', photo: !!photo,
-          confidence: r.confidence, notes: r.notes, note,
-          items: (r.items || []).map((i) => ({ name: i.name, portion: i.portion, g: r0(i.grams), kcal: r0(i.calories), p: r1(i.protein_g), c: r1(i.carbs_g), f: r1(i.fat_g), fib: r1(i.fiber_g) })),
-        };
-        if (!meal.items.length) meal.items.push(blankItem());
+        const content = [];
+        if (photo) content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: photo.split(',')[1] } });
+        content.push({ type: 'text', text: (photo ? 'Estimate the nutrition of this meal.' : 'Estimate the nutrition of this meal from my description.') + (note ? '\n\nDetails from me: ' + note : '') });
+        const r = await callClaude(content, SYSTEM, SCHEMA, 'medium');
+        const items = (r.items || []).map((i) => ({ name: i.name, portion: i.portion, g: r0(i.grams), kcal: r0(i.calories), p: r1(i.protein_g), c: r1(i.carbs_g), f: r1(i.fat_g), fib: r1(i.fiber_g) }));
+        const meal = newMeal(r.meal_name, items.length ? items : [blankItem()], { photo: !!photo, confidence: r.confidence, notes: r.notes, note });
         openEditor(meal, dayKey(viewDate), true, thumb, photo);
       } catch (e) {
-        sheetBody.innerHTML = keep;
-        sheetBody.insertAdjacentHTML('afterbegin', '<div class="ml-err">' + esc(e.message || String(e)) + '</div>');
-        const go = $('mlGo');
-        if (go) go.addEventListener('click', () => analyze({ photo, thumb, note: ($('mlNote') || {}).value || note }));
-        const man = $('mlManual');
-        if (man) man.addEventListener('click', () => { const now = new Date(); openEditor({ id: newId(), time: mealTime(now), slot: slotFor(now), name: note || 'Meal', items: [blankItem()] }, dayKey(viewDate), true); });
+        if (photo) {
+          openSheet('Snap a meal', '<div class="fu-err">' + esc(e.message || String(e)) + '</div><img class="fu-photo" src="' + photo + '" alt="">' + keyField()
+            + '<textarea class="fu-in" id="fuNote">' + esc(note || '') + '</textarea><button class="fu-btn" id="fuGo" type="button">Try again</button>');
+          $('fuGo').addEventListener('click', () => analyze({ photo, thumb, note: $('fuNote').value.trim() }));
+        } else openAddFood(note, e.message || String(e));
       }
     }
 
     // ---------- Review / edit ----------
     function openEditor(meal, k, isNew, thumb, photo) {
       const th = thumb || thumbs()[meal.id];
-      const html = (photo ? '<img class="ml-photo" src="' + photo + '" alt="">' : th ? '<img class="ml-photo" src="' + th + '" alt="" style="max-height:140px">' : '')
-        + '<input class="ml-in" id="mlName" value="' + esc(meal.name) + '" placeholder="Meal name">'
-        + '<div class="ml-slots" id="mlSlots" style="margin-top:10px">' + SLOTS.map((s) => '<button type="button" class="ml-slot' + (s === meal.slot ? ' on' : '') + '" data-s="' + s + '">' + s + '</button>').join('') + '</div>'
-        + '<div class="ml-tot" id="mlTot"></div>'
-        + (meal.notes || meal.confidence ? '<div class="ml-conf">' + (meal.confidence ? '<b>' + esc(meal.confidence[0].toUpperCase() + meal.confidence.slice(1)) + ' confidence.</b> ' : '') + esc(meal.notes || '') + '</div>' : '')
-        + '<div id="mlItems"></div>'
-        + '<button class="ml-ghost" id="mlAddItem" type="button" style="width:100%">+ Add item</button>'
-        + '<div class="ml-sheet-actions">' + (isNew ? '<button class="ml-ghost" id="mlCancel" type="button">Cancel</button>' : '<button class="ml-danger" id="mlDelete" type="button">Delete</button>')
-        + '<button class="ml-snap" id="mlSave" type="button">' + (isNew ? 'Save meal' : 'Save changes') + '</button></div>'
-        + (!isNew ? '<button class="ml-link" id="mlAgain" type="button" style="display:block;margin:12px auto 0">Log this again today</button>' : '');
+      const isFav = () => favs().some((f) => f.id === (meal.favId || meal.id) || f.name === meal.name);
+      const html = (photo ? '<img class="fu-photo" src="' + photo + '" alt="">' : th ? '<img class="fu-photo" src="' + th + '" alt="" style="max-height:150px">' : '')
+        + '<input class="fu-in" id="fuName" value="' + esc(meal.name) + '" placeholder="Meal name">'
+        + '<div class="fu-slots" id="fuSlots">' + SLOTS.map((s) => '<button type="button" class="fu-slot' + (s === meal.slot ? ' on' : '') + '" data-s="' + s + '">' + s + '</button>').join('')
+        + '<button type="button" class="fu-star' + (isFav() ? ' on' : '') + '" id="fuStar">' + (isFav() ? '★ Favorite' : '☆ Favorite') + '</button></div>'
+        + '<div class="fu-tot" id="fuTot"></div>'
+        + (meal.notes || meal.confidence ? '<div class="fu-conf">' + (meal.confidence ? '<b>' + esc(meal.confidence[0].toUpperCase() + meal.confidence.slice(1)) + ' confidence.</b> ' : '') + esc(meal.notes || '') + '</div>' : '')
+        + '<div id="fuItems"></div>'
+        + '<button class="fu-btn ghost" id="fuAddItem" type="button">+ Add item</button>'
+        + '<div class="fu-row2">' + (isNew ? '<button class="fu-btn ghost" id="fuCancel" type="button">Cancel</button>' : '<button class="fu-btn danger" id="fuDelete" type="button">Delete</button>')
+        + '<button class="fu-btn" id="fuSave" type="button">' + (isNew ? 'Save meal' : 'Save changes') + '</button></div>'
+        + (!isNew ? '<button class="fu-link" id="fuAgain" type="button" style="display:block;margin:16px auto 0">Log this again today</button>' : '');
       openSheet(isNew ? 'Review meal' : 'Edit meal', html);
       const items = meal.items;
       // base = values the estimate came with, so changing grams rescales the macros.
       items.forEach((i) => { i._base = i._base || { g: i.g, kcal: i.kcal, p: i.p, c: i.c, f: i.f, fib: i.fib }; });
       function drawTot() {
         const t = totals(items);
-        $('mlTot').innerHTML = '<div><b>' + r0(t.kcal) + '</b><span>kcal</span></div><div><b>' + r0(t.p) + '</b><span>protein</span></div><div><b>' + r0(t.c) + '</b><span>carbs</span></div><div><b>' + r0(t.f) + '</b><span>fat</span></div>';
+        $('fuTot').innerHTML = '<div><b>' + r0(t.kcal) + '</b><span>kcal</span></div><div><b style="color:var(--p)">' + r0(t.p) + '</b><span>protein</span></div><div><b style="color:var(--c)">' + r0(t.c) + '</b><span>carbs</span></div><div><b style="color:var(--f)">' + r0(t.f) + '</b><span>fat</span></div>';
       }
       function drawItems() {
-        $('mlItems').innerHTML = items.map((i, n) =>
-          '<div class="ml-item" data-n="' + n + '"><div class="ml-item-top">'
-          + '<input class="ml-in" data-f="name" value="' + esc(i.name) + '" placeholder="Food">'
-          + '<div class="ml-g"><input class="ml-in" data-f="g" inputmode="decimal" value="' + (i.g || '') + '" placeholder="0"><span>g</span></div>'
-          + '<button class="ml-del" type="button" aria-label="Remove item">×</button></div>'
-          + '<div class="ml-item-macros">'
-          + ['kcal', 'p', 'c', 'f'].map((f) => '<div><label>' + ({ kcal: 'kcal', p: 'protein', c: 'carbs', f: 'fat' })[f] + '</label><input class="ml-in" data-f="' + f + '" inputmode="decimal" value="' + (i[f] || 0) + '"></div>').join('')
-          + '</div>' + (i.portion ? '<div class="ml-portion">' + esc(i.portion) + '</div>' : '') + '</div>').join('');
-        $('mlItems').querySelectorAll('.ml-item').forEach((row) => {
+        $('fuItems').innerHTML = items.map((i, n) =>
+          '<div class="fu-item" data-n="' + n + '"><div class="fu-item-top">'
+          + '<input class="fu-in" data-f="name" value="' + esc(i.name) + '" placeholder="Food">'
+          + '<div class="fu-g"><input class="fu-in" data-f="g" inputmode="decimal" value="' + (i.g || '') + '" placeholder="0"><span>g</span></div>'
+          + '<button class="fu-del" type="button" aria-label="Remove item">×</button></div>'
+          + '<div class="fu-item-mac">' + ['kcal', 'p', 'c', 'f'].map((f) => '<div><label>' + ({ kcal: 'kcal', p: 'protein', c: 'carbs', f: 'fat' })[f] + '</label><input class="fu-in" data-f="' + f + '" inputmode="decimal" value="' + (i[f] || 0) + '"></div>').join('')
+          + '</div>' + (i.portion ? '<div class="fu-portion">' + esc(i.portion) + '</div>' : '') + '</div>').join('');
+        $('fuItems').querySelectorAll('.fu-item').forEach((row) => {
           const i = items[Number(row.dataset.n)];
           row.querySelectorAll('input').forEach((inp) => inp.addEventListener('input', () => {
             const f = inp.dataset.f;
@@ -965,70 +1216,93 @@ main {
             }
             drawTot();
           }));
-          row.querySelector('.ml-del').addEventListener('click', () => { items.splice(Number(row.dataset.n), 1); drawItems(); drawTot(); });
+          row.querySelector('.fu-del').addEventListener('click', () => { items.splice(Number(row.dataset.n), 1); drawItems(); drawTot(); });
         });
       }
       drawItems(); drawTot();
-      $('mlSlots').addEventListener('click', (e) => {
-        const b = e.target.closest('.ml-slot'); if (!b) return;
+      $('fuSlots').addEventListener('click', (e) => {
+        const b = e.target.closest('.fu-slot'); if (!b) return;
         meal.slot = b.dataset.s;
-        $('mlSlots').querySelectorAll('.ml-slot').forEach((x) => x.classList.toggle('on', x === b));
+        $('fuSlots').querySelectorAll('.fu-slot').forEach((x) => x.classList.toggle('on', x === b));
       });
-      $('mlAddItem').addEventListener('click', () => { items.push(Object.assign(blankItem(), { _base: { g: 0, kcal: 0, p: 0, c: 0, f: 0, fib: 0 } })); drawItems(); drawTot(); });
-      const clean = () => items.filter((i) => i.name.trim() || i.kcal).map((i) => { const o = Object.assign({}, i); delete o._base; return o; });
-      $('mlSave').addEventListener('click', () => {
-        meal.name = $('mlName').value.trim() || 'Meal';
+      let favWanted = isFav();
+      $('fuStar').addEventListener('click', () => {
+        favWanted = !favWanted;
+        $('fuStar').classList.toggle('on', favWanted);
+        $('fuStar').textContent = favWanted ? '★ Favorite' : '☆ Favorite';
+      });
+      $('fuAddItem').addEventListener('click', () => { items.push(Object.assign(blankItem(), { _base: { g: 0, kcal: 0, p: 0, c: 0, f: 0, fib: 0 } })); drawItems(); drawTot(); });
+      const clean = () => items.filter((i) => String(i.name).trim() || i.kcal).map((i) => { const o = Object.assign({}, i); delete o._base; return o; });
+      function syncFav(name) {
+        let list = favs().filter((f) => f.id !== (meal.favId || meal.id) && f.name !== name);
+        if (favWanted) { list.unshift({ id: meal.favId || meal.id, name, items: clean() }); list = list.slice(0, 12); }
+        writeLS(FAVS_KEY, list);
+      }
+      $('fuSave').addEventListener('click', () => {
+        meal.name = $('fuName').value.trim() || 'Meal';
         meal.items = clean();
         const arr = mealsFor(k).filter((m) => m.id !== meal.id);
         arr.push(meal);
         saveMeals(k, arr);
         if (thumb) saveThumb(meal.id, thumb);
+        if (favWanted || isFav()) syncFav(meal.name);
         closeSheet(); render();
       });
-      if (isNew) $('mlCancel').addEventListener('click', closeSheet);
+      if (isNew) $('fuCancel').addEventListener('click', closeSheet);
       else {
-        $('mlDelete').addEventListener('click', () => {
-          if (!confirm('Delete this meal?')) return;
-          saveMeals(k, mealsFor(k).filter((m) => m.id !== meal.id));
-          const t = thumbs(); delete t[meal.id]; writeLS(THUMBS_KEY, t);
+        $('fuDelete').addEventListener('click', () => {
+          const prev = mealsFor(k);
+          saveMeals(k, prev.filter((m) => m.id !== meal.id));
           closeSheet(); render();
+          toast('Meal deleted', () => { saveMeals(k, prev); render(); });
         });
-        $('mlAgain').addEventListener('click', () => {
+        $('fuAgain').addEventListener('click', () => {
           const now = new Date(), tk = dayKey(now);
           const copy = Object.assign({}, meal, { id: newId(), time: now.toISOString(), slot: slotFor(now), items: clean() });
-          const arr = mealsFor(tk); arr.push(copy); saveMeals(tk, arr);
+          saveMeals(tk, mealsFor(tk).concat([copy]));
           if (th) saveThumb(copy.id, th);
-          viewDate = new Date(); viewDate.setHours(12, 0, 0, 0);
+          viewDate = noon(now);
           closeSheet(); render();
+          toast(copy.name + ' logged again');
         });
       }
     }
 
     // ---------- Goals ----------
-    $('mlGoalsBtn').addEventListener('click', () => {
-      const g = goals();
-      openSheet('Daily goals', '<div class="ml-goal-grid">'
-        + [['kcal', 'Calories'], ['p', 'Protein (g)'], ['c', 'Carbs (g)'], ['f', 'Fat (g)']].map(([k, l]) => '<label>' + l + '<input class="ml-in" data-g="' + k + '" inputmode="numeric" value="' + g[k] + '"></label>').join('')
-        + '</div><div class="ml-hint" id="mlGoalHint"></div>'
-        + '<div class="ml-sheet-actions"><button class="ml-ghost" id="mlCancel" type="button">Cancel</button><button class="ml-snap" id="mlSave" type="button">Save goals</button></div>');
-      const hint = () => {
-        const v = (k) => parseFloat(sheetBody.querySelector('[data-g="' + k + '"]').value) || 0;
-        const fromMacros = r0(v('p') * 4 + v('c') * 4 + v('f') * 9);
-        $('mlGoalHint').textContent = 'Your macros add up to ' + fromMacros.toLocaleString() + ' kcal (protein & carbs 4 kcal/g, fat 9 kcal/g).';
+    $('fuGoalsBtn').addEventListener('click', () => {
+      const all = allGoals();
+      let tab = dayType(dayKey(viewDate));
+      const fields = [['kcal', 'Calories'], ['p', 'Protein (g)'], ['c', 'Carbs (g)'], ['f', 'Fat (g)']];
+      openSheet('Daily goals', '<div class="fu-seg fu-goal-tabs" id="fuGoalTab"><button type="button" data-t="gym">Gym day</button><button type="button" data-t="rest">Rest day</button></div>'
+        + '<div class="fu-goal-grid" id="fuGoalGrid"></div><div class="fu-hint" id="fuGoalHint"></div>'
+        + '<div class="fu-hint">Gym day is picked automatically on days you lift (from Lyfta / your Fitness log). Tap Gym day / Rest day at the top to override a day.</div>'
+        + '<div class="fu-row2"><button class="fu-btn ghost" id="fuCancel" type="button">Cancel</button><button class="fu-btn" id="fuSave" type="button">Save goals</button></div>');
+      const read = () => sheetBody.querySelectorAll('[data-g]').forEach((i) => { all[tab][i.dataset.g] = Math.max(0, r0(i.value)); });
+      const draw = () => {
+        $('fuGoalTab').querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.t === tab));
+        $('fuGoalGrid').innerHTML = fields.map(([k, l]) => '<label>' + l + '<input class="fu-in" data-g="' + k + '" inputmode="numeric" value="' + all[tab][k] + '"></label>').join('');
+        const hint = () => {
+          const v = (k) => parseFloat(sheetBody.querySelector('[data-g="' + k + '"]').value) || 0;
+          $('fuGoalHint').textContent = 'Macros add up to ' + r0(v('p') * 4 + v('c') * 4 + v('f') * 9).toLocaleString() + ' kcal (protein & carbs 4/g, fat 9/g).';
+        };
+        sheetBody.querySelectorAll('[data-g]').forEach((i) => i.addEventListener('input', hint)); hint();
       };
-      sheetBody.querySelectorAll('[data-g]').forEach((i) => i.addEventListener('input', hint)); hint();
-      $('mlCancel').addEventListener('click', closeSheet);
-      $('mlSave').addEventListener('click', () => {
-        const out = {};
-        sheetBody.querySelectorAll('[data-g]').forEach((i) => { out[i.dataset.g] = Math.max(1, r0(i.value)); });
-        writeLS(GOALS_KEY, out); closeSheet(); render();
-      });
+      $('fuGoalTab').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; read(); tab = b.dataset.t; draw(); });
+      draw();
+      $('fuCancel').addEventListener('click', closeSheet);
+      $('fuSave').addEventListener('click', () => { read(); writeLS(GOALS_KEY, all); closeSheet(); render(); });
     });
 
     // Re-render when synced data arrives from another device (sync.js fires 'storage').
     window.addEventListener('storage', () => { if (!sheetBg.classList.contains('open')) render(); });
     // Roll over to the new day if the page stays open past midnight.
-    document.addEventListener('visibilitychange', () => { if (!document.hidden && !sheetBg.classList.contains('open')) render(); });
+    let lastToday = dayKey(new Date());
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden || sheetBg.classList.contains('open')) return;
+      const nowKey = dayKey(new Date());
+      if (nowKey !== lastToday && dayKey(viewDate) === lastToday) viewDate = noon(new Date());
+      lastToday = nowKey; render();
+    });
     render();
   })();
   </script>
@@ -1043,8 +1317,8 @@ document.addEventListener('DOMContentLoaded', function () {
     // Meals live in their own row: the Water page syncs the 'health' row
     // with only po_water_v1, which would overwrite anything else in it.
     appKey: 'meals',
-    syncedKeys: ['meals:goals'],
-    syncedPrefixes: ['meals:day:'],
+    syncedKeys: ['meals:goals', 'meals:favs'],
+    syncedPrefixes: ['meals:day:', 'meals:type:'],
     onApplied: function () {
       window.dispatchEvent(new Event('storage'));
     }
