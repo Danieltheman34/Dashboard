@@ -399,6 +399,18 @@ body::after {
   const WATER_KEY = 'po_water_v1';
   const WHOOP_KEY = 'whoop_tokens_v1';
   const SYNC_KEY  = 'whoop_last_sync';
+  const WHOOP_CLIENT_ID = '3b9d1b01-31fb-4bd8-b18c-c7fa27deed2f';
+  const WHOOP_SCOPES = 'read:recovery read:sleep read:workout read:cycles read:profile read:body_measurement offline';
+
+  // WHOOP sign-in returns here (/api/whoop-callback → /index.html#whoop_access=…).
+  if (location.hash.indexOf('whoop_access') !== -1) {
+    const h = new URLSearchParams(location.hash.slice(1));
+    const access = h.get('whoop_access');
+    if (access) {
+      try { localStorage.setItem(WHOOP_KEY, JSON.stringify({ access, refresh: h.get('whoop_refresh'), expires: Number(h.get('whoop_expires')) || Date.now() + 3500e3 })); } catch (e) {}
+    }
+    history.replaceState(null, '', location.pathname + location.search);
+  }
 
   function loadJSON(k, f) { try { return JSON.parse(localStorage.getItem(k)) || f; } catch (e) { return f; } }
   function saveJSON(k, v) { localStorage.setItem(k, JSON.stringify(v)); }
@@ -509,7 +521,7 @@ body::after {
     if (!t || !t.access) {
       statusEl.classList.remove('on'); txt.textContent = 'Not connected';
       syncEl.textContent = ''; $('whStats').style.display = 'none';
-      action.textContent = 'Connect on Health page';
+      action.textContent = 'Connect WHOOP';
       return;
     }
     statusEl.classList.add('on'); txt.textContent = err ? 'Connected (sync failed)' : 'Connected';
@@ -562,7 +574,15 @@ body::after {
   }
   $('whAction').addEventListener('click', () => {
     const t = loadJSON(WHOOP_KEY, null);
-    if (!t || !t.access) { window.location.href = 'health.html'; return; }
+    if (!t || !t.access) {
+      location.href = 'https://api.prod.whoop.com/oauth/oauth2/auth'
+        + '?client_id=' + encodeURIComponent(WHOOP_CLIENT_ID)
+        + '&redirect_uri=' + encodeURIComponent(location.origin + '/api/whoop-callback')
+        + '&response_type=code'
+        + '&scope=' + encodeURIComponent(WHOOP_SCOPES)
+        + '&state=' + Math.random().toString(36).slice(2);
+      return;
+    }
     $('whAction').textContent = 'Syncing…'; syncWhoop();
   });
 })();

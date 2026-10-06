@@ -1380,7 +1380,7 @@ img, video, canvas, svg { max-width: 100%; }
     <!-- Recovery -->
     <div class="tr-card" id="trRecCard">
       <div class="tr-head">
-        <div><div class="tr-eyebrow">Recovery</div><div class="tr-title">Ready to train?</div></div>
+        <div><div class="tr-eyebrow" id="trRecEyebrow">Recovery</div><div class="tr-title" id="trRecTitle">Ready to train?</div></div>
         <span class="tr-status" id="trRecStatus"></span>
       </div>
       <div id="trRecBody" class="tr-msg">Loading…</div>
@@ -1631,7 +1631,10 @@ img, video, canvas, svg { max-width: 100%; }
     async function renderRecovery() {
       const body = $('trRecBody');
       if (!readLS('whoop_tokens_v1', null)) {
-        body.innerHTML = 'Connect WHOOP on the <a href="health.html">Health page</a> to see today\'s recovery here.';
+        // No WHOOP: show training load only (connect WHOOP from Settings on the home screen).
+        $('trRecEyebrow').textContent = 'Training load';
+        $('trRecTitle').textContent = 'Last 7 days';
+        body.innerHTML = '';
         $('trRecStatus').innerHTML = '';
         renderLoadOnly();
         return;
@@ -1669,6 +1672,8 @@ img, video, canvas, svg { max-width: 100%; }
     function renderLoadOnly() {
       const body = $('trRecBody');
       if (!$('trLoad')) body.insertAdjacentHTML('beforeend', '<div class="tr-load" id="trLoad"></div>');
+      // Without the recovery ring above it, drop the divider line.
+      if (!body.textContent.trim() || body.firstElementChild === $('trLoad')) Object.assign($('trLoad').style, { marginTop: '0', paddingTop: '0', borderTop: '0' });
       renderLoad();
     }
     // Training load: sets in the last 7 days vs the average of the 3 weeks before.
