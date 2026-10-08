@@ -349,7 +349,7 @@ body::after {
       <div class="field-row">
         <input class="set-input" id="heightA" type="number" min="0" inputmode="decimal" placeholder="cm">
         <input class="set-input" id="heightB" type="number" min="0" inputmode="decimal" placeholder="in" style="display:none">
-        <div class="seg" id="heightUnitSeg">
+        <div class="seg" id="heightUnitSeg" hidden>
           <button type="button" data-u="cm" class="on">cm</button>
           <button type="button" data-u="ft">ft/in</button>
         </div>
@@ -359,8 +359,8 @@ body::after {
     <div class="field">
       <label class="field-label">Weight</label>
       <div class="field-row">
-        <input class="set-input" id="weight" type="number" min="0" inputmode="decimal" placeholder="weight">
-        <div class="seg" id="weightUnitSeg">
+        <input class="set-input" id="weight" type="number" min="0" inputmode="decimal" placeholder="lb">
+        <div class="seg" id="weightUnitSeg" hidden>
           <button type="button" data-u="kg" class="on">kg</button>
           <button type="button" data-u="lb">lb</button>
         </div>
@@ -431,7 +431,7 @@ body::after {
 
   // Mirror of topbar.js defaultWaterState so we never clobber the water tracker.
   function defaultWater() {
-    return { unit:'bottle', bottleMl:500, glassMl:250, weightUnit:'kg',
+    return { unit:'bottle', bottleMl:500, glassMl:250, weightUnit:'lb',
       profile:{ weightKg:75, age:25, sex:'m', activityHrsPerWeek:5 },
       caffeineMgPerDay:200, substances:[], logs:{} };
   }
@@ -474,8 +474,9 @@ body::after {
   function populate() {
     const w = loadJSON(WATER_KEY, defaultWater());
     const p = w.profile || {};
-    setWeightUnit(w.weightUnit === 'lb' ? 'lb' : 'kg');
-    setHeightUnit(p.heightUnit === 'ft' ? 'ft' : 'cm');
+    // Always lb and ft/in.
+    setWeightUnit('lb');
+    setHeightUnit('ft');
     setSex(p.sex === 'f' ? 'f' : 'm');
     fillHeight(p.heightCm || null);
     if (p.weightKg) $('weight').value = weightUnit === 'lb' ? Math.round(p.weightKg * 2.20462) : Math.round(p.weightKg);

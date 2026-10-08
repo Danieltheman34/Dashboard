@@ -338,7 +338,7 @@ body::after {
   function readProfile() {
     const w = loadJSON('po_water_v1', null);
     if (w && w.profile && w.profile.weightKg) {
-      const kg = w.weightUnit === 'lb' ? w.profile.weightKg/2.20462 : w.profile.weightKg;
+      const kg = w.profile.weightKg; // always stored in kg
       if (kg > 0) bodyKg = kg;
     }
   }
@@ -562,7 +562,7 @@ body::after {
     else if(total>=target){ msg.classList.add('warn'); msg.textContent="Getting up there. "+(limit-total)+" mg until your ceiling."; }
     else { msg.classList.add('good'); msg.textContent="You're in a good range — "+(target-total)+" mg under your target."; }
     const parts=[];
-    if(bodyKg) parts.push('Target ~'+target+' mg (3 mg/kg for '+Math.round(bodyKg)+' kg). Ceiling '+limit+' mg.');
+    if(bodyKg) parts.push('Target ~'+target+' mg (about 1.4 mg per lb at '+Math.round(bodyKg*2.20462)+' lb). Ceiling '+limit+' mg.');
     else parts.push('Using the 400 mg/day ceiling — add your weight in Settings for a personalized target.');
     if(recovery!=null) parts.push('WHOOP recovery '+recovery+'%'+(recovery<34?' — limit pulled back to '+limit+' mg.':'.'));
     $('dailyNote').innerHTML=parts.join('<br>');

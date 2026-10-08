@@ -181,7 +181,7 @@ main { position: relative; max-width: 820px; margin: 0 auto; padding: 28px 16px 
     s.unit = s.unit || 'bottle';
     s.logs = s.logs && typeof s.logs === 'object' ? s.logs : {};
     s.profile = Object.assign({ weightKg: 75, age: 25, sex: 'm', activityHrsPerWeek: 5 }, s.profile || {});
-    s.weightUnit = s.weightUnit || 'kg';
+    s.weightUnit = 'lb';
     if (s.caffeineMgPerDay == null) s.caffeineMgPerDay = 200;
     s.substances = Array.isArray(s.substances) ? s.substances : [];
     s.sizesOz = Array.isArray(s.sizesOz) && s.sizesOz.length === 3 ? s.sizesOz : [8, 16, 64];
@@ -200,9 +200,9 @@ main { position: relative; max-width: 820px; margin: 0 auto; padding: 28px 16px 
   // +100 ml age 50+. Same formula the old water coach used.
   function autoBreakdown() {
     const p = state.profile;
-    const kg = state.weightUnit === 'lb' ? p.weightKg / 2.20462 : p.weightKg;
+    const kg = p.weightKg || 0; // always stored in kg
     const parts = [
-      ['Body weight (' + Math.round(kg) + ' kg × 35 ml)', kg * 35],
+      ['Body weight (' + Math.round(kg * 2.20462) + ' lb)', kg * 35],
       ['Training (' + (p.activityHrsPerWeek || 0) + ' h/wk)', (p.activityHrsPerWeek || 0) / 7 * 500],
       ['Caffeine over 200 mg', Math.max(0, (state.caffeineMgPerDay || 0) - 200) * 1.5],
       ['Meds & stims', state.substances.reduce((t, x) => t + Math.max(0, ((x.dose != null ? x.dose : x.defaultDose) || 0) * (x.mlPerUnit || 0)), 0)],

@@ -23,8 +23,8 @@
 const CONFIG = {
   appTitle: "Progressive Overload Coach",
 
-  // Weight unit shown everywhere. "kg" or "lb".
-  units: "kg",
+  // Weight unit shown everywhere. Always "lb".
+  units: "lb",
 
   // Gyms you train at. Add as many as you want.
   // `id` must be a short unique slug (no spaces). `name` is what people see.
@@ -1860,7 +1860,7 @@ img, video, canvas, svg { max-width: 100%; }
         st.lyftaImportVer = IMPORT_VER;
         migrated = true;
       }
-      const coachUnit = st.units || 'kg';
+      const coachUnit = st.units || 'lb';
       const seen = new Set();
       Object.values(st.logs).forEach((arr) => (arr || []).forEach((l) => { if (l.lid) seen.add(l.lid); }));
       let added = 0;
@@ -1955,7 +1955,7 @@ img, video, canvas, svg { max-width: 100%; }
     <div class="wt-card">
       <div class="wt-row">
         <span class="wt-num" id="wtNum">—</span>
-        <span class="wt-unit" id="wtUnit">kg</span>
+        <span class="wt-unit" id="wtUnit">lb</span>
       </div>
       <div class="wt-delta hidden" id="wtDelta"></div>
       <div class="wt-streak hidden" id="wtStreak">🔥<span id="wtStreakNum">0 day streak</span></div>
@@ -2005,7 +2005,7 @@ img, video, canvas, svg { max-width: 100%; }
           <span class="wt-locked-check">✓</span>
           <div>
             <div class="wt-locked-label">LOGGED TODAY</div>
-            <div class="wt-locked-value" id="wtLockedValue">— kg</div>
+            <div class="wt-locked-value" id="wtLockedValue">— lb</div>
           </div>
         </div>
         <button class="wt-edit-btn" id="wtEditBtn">Edit</button>
@@ -2014,7 +2014,7 @@ img, video, canvas, svg { max-width: 100%; }
       <div class="wt-input-row" id="wtInputRow">
         <div class="wt-input-top">
           <input type="number" step="0.1" class="wt-input" id="wtInput" placeholder="Enter weight" inputmode="decimal" aria-label="Today's weight">
-          <span class="wt-unit-static" id="wtUnitStatic">kg</span>
+          <span class="wt-unit-static" id="wtUnitStatic">lb</span>
           <button class="wt-save-btn" id="wtSaveBtn">Save</button>
         </div>
       </div>
@@ -2152,7 +2152,7 @@ img, video, canvas, svg { max-width: 100%; }
       </div>
       <div class="po-log-grid" id="logGrid">
         <div class="po-field" id="weightField">
-          <label id="weightLabel">Weight (kg)</label>
+          <label id="weightLabel">Weight (lb)</label>
           <div class="po-weight-row">
             <button class="po-w-btn" id="weightDownBtn" type="button">−</button>
             <input type="number" id="weightInput" step="0.5" inputmode="decimal" placeholder="0">
@@ -2189,7 +2189,7 @@ img, video, canvas, svg { max-width: 100%; }
       <div class="po-stats-row">
         <div class="po-stat-box">
           <div class="po-stat-label" id="oneRmLabel">Est. 1RM</div>
-          <div class="po-stat-val" id="oneRm">—<span class="po-unit" id="oneRmUnit">kg</span></div>
+          <div class="po-stat-val" id="oneRm">—<span class="po-unit" id="oneRmUnit">lb</span></div>
         </div>
         <div class="po-stat-box">
           <div class="po-stat-label">Best set</div>
@@ -2240,7 +2240,7 @@ img, video, canvas, svg { max-width: 100%; }
               <span class="po-tw-summary-num" id="poTwSetCount">0</span>
               <span class="po-tw-summary-label">sets</span>
               <span class="po-tw-summary-sep">·</span>
-              <span class="po-tw-summary-vol" id="poTwTotalVol">0 kg lifted</span>
+              <span class="po-tw-summary-vol" id="poTwTotalVol">0 lb lifted</span>
             </div>
           </div>
           <button class="po-tw-done-btn" id="poTwDoneBtn" type="button">Mark workout done</button>
@@ -2410,7 +2410,7 @@ img, video, canvas, svg { max-width: 100%; }
       if (!acts.length) { list.innerHTML = '<li class="sv-empty">No activities yet — finish a workout in Lyfta and it\'ll land here.</li>'; return; }
       list.innerHTML = acts.map((a) => {
         const bits = [fmtDate(a.start_date_local), fmtDur(a.moving_time || a.elapsed_time || 0)];
-        if (a.distance > 50) bits.push((a.distance / 1000).toFixed(2) + ' km');
+        if (a.distance > 50) bits.push((a.distance / 1609.344).toFixed(2) + ' mi');
         if (a.average_heartrate) bits.push(Math.round(a.average_heartrate) + ' bpm');
         return '<li class="sv-item" data-id="' + esc(a.id) + '">'
           + '<button class="sv-row" type="button"><span class="sv-ico">' + (ICONS[a.sport_type] || ICONS[a.type] || '⚡') + '</span>'
@@ -2556,7 +2556,7 @@ img, video, canvas, svg { max-width: 100%; }
   <div class="po-modal" style="max-width: 480px;">
     <h3>Settings</h3>
 
-    <div class="po-set-section">
+    <div class="po-set-section" hidden>
       <h4>Units</h4>
       <div class="po-modal-seg" id="setUnitsSeg">
         <button data-u="kg">kg</button>
@@ -2615,7 +2615,7 @@ img, video, canvas, svg { max-width: 100%; }
   }
   function normalize(s) {
     s = s || {};
-    s.units = s.units || CONFIG.units || 'kg';
+    s.units = s.units || CONFIG.units || 'lb';
     s.gyms  = (Array.isArray(s.gyms)  && s.gyms.length)  ? s.gyms  : CONFIG.gyms.slice();
     s.days  = (Array.isArray(s.days)  && s.days.length)  ? s.days  : CONFIG.days.slice();
     s.exercises = Array.isArray(s.exercises) ? s.exercises : buildDefaultExercises();
@@ -4213,6 +4213,9 @@ img, video, canvas, svg { max-width: 100%; }
   // ============================================================
   // BOOT
   // ============================================================
+  // Everything is shown in lb. Older saves in kg are converted once.
+  function ensureLb() { if (state.units !== 'lb') convertUnits('lb'); }
+  ensureLb();
   renderAll();
   wtRender();
   photosRender();
@@ -4303,6 +4306,7 @@ img, video, canvas, svg { max-width: 100%; }
     // in-memory copies from before the remote pull.
     try { state = loadState(); } catch {}
     try { wtEntries = wtLoad(); } catch {}
+    try { ensureLb(); } catch {}
     try {
       const raw = localStorage.getItem(PHOTO_KEY);
       photos = raw ? JSON.parse(raw) : [];
@@ -4584,7 +4588,7 @@ img, video, canvas, svg { max-width: 100%; }
   const SYS = "You are Nova, the user's personal gym coach living inside their fitness dashboard. "
     + "You can see their body profile, bodyweight log (entries have dateKey + weight), workout logs, and progress-photo timeline (dates + bodyweight; the actual images are not included). "
     + "Coach concisely and specifically. For an overview, cover: bodyweight trend, training consistency, standout progress, and 1-2 concrete next steps. "
-    + "Use short markdown bullets, be encouraging but honest. Weights may be kg or lb per their profile. Keep replies under ~180 words. Their data as JSON: ";
+    + "Use short markdown bullets, be encouraging but honest. All weights are in lb; distances in miles. Keep replies under ~180 words. Their data as JSON: ";
 
   async function ask(text){
     text = (text||'').trim(); if (!text || busy) return;

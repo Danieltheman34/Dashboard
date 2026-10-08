@@ -366,7 +366,7 @@ body.topbar-modal-open {
     if (state.goalOz === undefined) return 110; // Daniel's daily target until changed on the Water page
     if (state.goalOz > 0) return state.goalOz;
     const p = state.profile || { weightKg: 75 };
-    const wKg = state.weightUnit === 'lb' ? (p.weightKg || 0) / 2.20462 : (p.weightKg || 0);
+    const wKg = p.weightKg || 0; // always stored in kg
     const base = wKg * 35;
     const exercise = (p.activityHrsPerWeek || 0) / 7 * 500;
     const caffeine = Math.max(0, (state.caffeineMgPerDay || 0) - 200) * 1.5;
@@ -416,7 +416,7 @@ body.topbar-modal-open {
   // -------- Water +1 (works from any page) --------
   function defaultWaterState() {
     return {
-      unit: 'bottle', bottleMl: 500, glassMl: 250, weightUnit: 'kg',
+      unit: 'bottle', bottleMl: 500, glassMl: 250, weightUnit: 'lb',
       profile: { weightKg: 75, age: 25, sex: 'm', activityHrsPerWeek: 5 },
       caffeineMgPerDay: 200, substances: [], logs: {}
     };
