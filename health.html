@@ -639,7 +639,7 @@ main {
     /* Sheet */
     .fu-sheet-bg { position: fixed; inset: 0; z-index: 200; background: rgba(2,8,6,0.66); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); display: none; align-items: flex-end; justify-content: center; }
     .fu-sheet-bg.open { display: flex; }
-    .fu-sheet { width: 100%; max-width: 560px; max-height: 92vh; overflow-y: auto; background: linear-gradient(180deg, #0F1A16, #0A110E); border: 1px solid var(--line-2); border-bottom: 0; border-radius: 24px 24px 0 0; padding: 20px 20px calc(20px + env(safe-area-inset-bottom)); color: var(--dim); }
+    .fu-sheet { width: 100%; max-width: 560px; max-height: 92vh; max-height: 92dvh; overflow-y: auto; overscroll-behavior: contain; background: linear-gradient(180deg, #0F1A16, #0A110E); border: 1px solid var(--line-2); border-bottom: 0; border-radius: 24px 24px 0 0; padding: 20px 20px calc(20px + env(safe-area-inset-bottom)); color: var(--dim); }
     @media (min-width: 640px) { .fu-sheet-bg { align-items: center; } .fu-sheet { border-radius: 24px; border-bottom: 1px solid var(--line-2); } }
     .fu-sheet-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
     .fu-sheet-title { font-family: var(--serif); font-style: italic; font-size: 30px; color: var(--ink); line-height: 1; }
@@ -973,6 +973,9 @@ main {
 
     // ---------- Sheet ----------
     const sheetBg = $('fuSheetBg'), sheetBody = $('fuSheetBody');
+    // <main> is its own stacking layer (z-index 2), which would trap the sheet under the
+    // bottom tab bar. Move the sheet and toast to <body> so they sit on top of it.
+    document.body.appendChild(sheetBg); document.body.appendChild($('fuToast'));
     function openSheet(title, html) { $('fuSheetTitle').textContent = title; sheetBody.innerHTML = html; sheetBg.classList.add('open'); document.body.style.overflow = 'hidden'; }
     function closeSheet() { sheetBg.classList.remove('open'); document.body.style.overflow = ''; }
     $('fuClose').addEventListener('click', closeSheet);
