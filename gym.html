@@ -7,6 +7,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0a0a0b">
 <title>Progressive Overload Coach</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&display=swap" rel="stylesheet">
 <script src="topbar.js" defer></script>
 
 <!-- =============================================================
@@ -1325,27 +1328,41 @@ img, video, canvas, svg { max-width: 100%; }
     .tr-strip-legend { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-3); margin-top: 6px; font-family: var(--font-mono); }
     .tr-strip-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin: 0 4px 0 10px; vertical-align: -1px; }
 
-    /* Body map */
+    /* Muscle map */
     .tr-seg { display: inline-flex; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 999px; padding: 2px; }
     .tr-seg button { border: 0; background: none; color: var(--text-3); font-family: inherit; font-size: 11.5px; font-weight: 600; padding: 5px 10px; border-radius: 999px; cursor: pointer; }
     .tr-seg button.on { background: rgba(255,255,255,0.10); color: var(--text-1); }
-    .tr-body { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; max-width: 360px; margin: 4px auto 0; }
-    .tr-body figure { margin: 0; text-align: center; }
-    .tr-body svg { width: 100%; height: auto; display: block; }
-    .tr-body figcaption { font-size: 9.5px; letter-spacing: 0.18em; color: var(--text-4); font-weight: 700; margin-top: 4px; }
-    .tr-body .m { fill: #1e1e24; stroke: rgba(255,255,255,0.07); stroke-width: 0.6; cursor: pointer; transition: fill 0.4s; }
-    .tr-body .m.sel { stroke: #fff; stroke-width: 1.2; }
-    .tr-body .n { fill: #16161b; stroke: rgba(255,255,255,0.05); stroke-width: 0.6; }
-    .tr-scale { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 10px; color: var(--text-3); margin-top: 10px; }
-    .tr-scale-bar { width: 110px; height: 6px; border-radius: 999px; background: linear-gradient(90deg, #1e1e24, rgba(255,107,53,0.45), #ff6b35); }
-    .tr-musc { margin-top: 14px; display: grid; gap: 7px; }
-    .tr-musc-row { display: grid; grid-template-columns: 92px 1fr 44px; align-items: center; gap: 10px; font-size: 12px; }
-    .tr-musc-row span:first-child { color: var(--text-2); }
-    .tr-musc-bar { height: 6px; background: rgba(255,255,255,0.05); border-radius: 999px; overflow: hidden; }
-    .tr-musc-bar i { display: block; height: 100%; background: #ff6b35; border-radius: 999px; }
-    .tr-musc-row b { text-align: right; font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--text-2); }
-    .tr-gap { margin-top: 12px; font-size: 12px; color: var(--text-3); line-height: 1.5; }
-    .tr-gap b { color: var(--warn); font-weight: 600; }
+    .bm-card { background: linear-gradient(180deg, #1B1B1D, #161618); }
+    .bm-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+    .bm-title { font-size: 11px; font-weight: 700; letter-spacing: 0.24em; text-transform: uppercase; color: #B7B2AA; }
+    .bm-meta { font-size: 13px; color: #9C978F; letter-spacing: 0.02em; }
+    .bm-stage { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 4%; padding: 22px 6% 14px; border-radius: 18px;
+      background: radial-gradient(70% 60% at 50% 45%, #141416, #050506 75%); border: 1px solid rgba(255,255,255,0.05); }
+    .bm-stage figure { margin: 0; text-align: center; }
+    .bm-stage svg { width: 100%; height: auto; display: block; }
+    .bm-stage figcaption { font-size: 10.5px; letter-spacing: 0.32em; color: #77736C; margin-top: 2px; }
+    .bm-outline path { fill: #1a1a1a; stroke: #2E2E30; stroke-width: 9; stroke-linejoin: round; }
+    .bm-skin path { fill: #EFEFEF; stroke: #EFEFEF; stroke-width: 6.5; stroke-linejoin: round; }
+    .bm-n { fill: #F4F4F4; stroke: rgba(0,0,0,0.16); stroke-width: 0.6; }
+    .bm-m { fill: #CFCFCF; stroke: rgba(0,0,0,0.32); stroke-width: 0.7; stroke-linejoin: round; cursor: pointer; transition: fill 0.45s, filter 0.2s; }
+    .bm-m.low { fill: #4F7FD3; } .bm-m.mod { fill: #E3923F; } .bm-m.hit { fill: #DB4836; }
+    .bm-m.sel { filter: brightness(1.25) drop-shadow(0 0 3px rgba(255,255,255,0.6)); }
+    .bm-line path { fill: none; stroke: rgba(255,255,255,0.5); stroke-width: 0.7; pointer-events: none; }
+    .bm-count { display: flex; align-items: flex-end; gap: 16px; margin: 26px 0 0; }
+    .bm-count b { font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 84px; line-height: 0.8; color: #F3EFE8; }
+    .bm-count span { font-size: 16px; color: #A6A199; line-height: 1.35; max-width: 220px; padding-bottom: 2px; }
+    .bm-sel { font-size: 13px; color: #A6A199; margin-top: 14px; min-height: 18px; }
+    .bm-sel b { color: #F3EFE8; font-weight: 600; }
+    .bm-legend { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 20px; margin-top: 18px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,0.07); }
+    .bm-legend div { display: flex; align-items: center; gap: 10px; font-size: 14px; color: #B7B2AA; }
+    .bm-legend i { width: 16px; height: 16px; border-radius: 4px; flex-shrink: 0; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.15); }
+    .bm-groups { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px 18px; margin-top: 18px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,0.07); }
+    .bm-group { display: grid; grid-template-columns: 10px 1fr auto; align-items: center; gap: 10px; font-size: 13px; color: #B7B2AA; padding: 5px 0; cursor: pointer; }
+    .bm-group i { width: 8px; height: 8px; border-radius: 50%; background: #CFCFCF; }
+    .bm-group i.low { background: #4F7FD3; } .bm-group i.mod { background: #E3923F; } .bm-group i.hit { background: #DB4836; }
+    .bm-group b { font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: #EDE8E0; }
+    .bm-group.sel { color: #fff; }
+    @media (max-width: 420px) { .bm-count b { font-size: 68px; } .bm-groups { grid-template-columns: 1fr; } .bm-legend div { font-size: 13px; } }
 
     /* Last workout */
     .tr-ex { border-top: 1px solid var(--border); padding: 11px 0; }
@@ -1403,85 +1420,28 @@ img, video, canvas, svg { max-width: 100%; }
       <div class="tr-strip-legend"><span>2 weeks ago</span><span><i style="background:rgba(255,107,53,0.75)"></i>Lift<i style="background:rgba(110,231,183,0.45)"></i>Cardio</span><span>Today</span></div>
     </div>
 
-    <!-- Muscle map -->
-    <div class="tr-card">
-      <div class="tr-head">
-        <div><div class="tr-eyebrow">Muscles worked</div><div class="tr-sub" id="trMapSub">—</div></div>
-        <div class="tr-seg" id="trMapSeg">
-          <button type="button" data-r="last" class="on">Last</button>
-          <button type="button" data-r="7">7 days</button>
-          <button type="button" data-r="30">30 days</button>
-        </div>
+    <!-- Muscle map — sets per muscle group (primary = 1 set, secondary = ½) -->
+    <div class="tr-card bm-card">
+      <div class="bm-top">
+        <span class="bm-title" id="bmTitle">Muscle map · this week</span>
+        <span class="bm-meta" id="bmMeta">—</span>
       </div>
-      <div class="tr-body">
-        <figure>
-          <svg viewBox="0 0 120 232" aria-label="Front muscles">
-            <circle class="n" cx="60" cy="16" r="11"/>
-            <rect class="n" x="54" y="26" width="12" height="9" rx="3"/>
-            <ellipse class="m" data-m="front_delts" cx="40" cy="45" rx="8.5" ry="7.5"/>
-            <ellipse class="m" data-m="front_delts" cx="80" cy="45" rx="8.5" ry="7.5"/>
-            <ellipse class="m" data-m="side_delts" cx="33" cy="49" rx="4" ry="7"/>
-            <ellipse class="m" data-m="side_delts" cx="87" cy="49" rx="4" ry="7"/>
-            <path class="m" data-m="chest" d="M59,39 L45,40 Q38,44 40,54 Q46,62 59,58 Z"/>
-            <path class="m" data-m="chest" d="M61,39 L75,40 Q82,44 80,54 Q74,62 61,58 Z"/>
-            <ellipse class="m" data-m="biceps" cx="33" cy="66" rx="5.5" ry="11"/>
-            <ellipse class="m" data-m="biceps" cx="87" cy="66" rx="5.5" ry="11"/>
-            <ellipse class="m" data-m="forearms" cx="29" cy="91" rx="4.5" ry="12" transform="rotate(8 29 91)"/>
-            <ellipse class="m" data-m="forearms" cx="91" cy="91" rx="4.5" ry="12" transform="rotate(-8 91 91)"/>
-            <circle class="n" cx="26" cy="108" r="4"/>
-            <circle class="n" cx="94" cy="108" r="4"/>
-            <rect class="m" data-m="abs" x="52.5" y="61" width="15" height="38" rx="4"/>
-            <path class="m" data-m="obliques" d="M51,62 L43,60 Q40,78 44,97 L51,99 Z"/>
-            <path class="m" data-m="obliques" d="M69,62 L77,60 Q80,78 76,97 L69,99 Z"/>
-            <path class="n" d="M44,100 L76,100 L71,114 L49,114 Z"/>
-            <ellipse class="m" data-m="quads" cx="50" cy="138" rx="9" ry="23"/>
-            <ellipse class="m" data-m="quads" cx="70" cy="138" rx="9" ry="23"/>
-            <ellipse class="m" data-m="adductors" cx="57.5" cy="124" rx="2.6" ry="11"/>
-            <ellipse class="m" data-m="adductors" cx="62.5" cy="124" rx="2.6" ry="11"/>
-            <circle class="n" cx="50" cy="165" r="5"/>
-            <circle class="n" cx="70" cy="165" r="5"/>
-            <ellipse class="m" data-m="calves" cx="49" cy="189" rx="5.5" ry="16"/>
-            <ellipse class="m" data-m="calves" cx="71" cy="189" rx="5.5" ry="16"/>
-            <ellipse class="n" cx="48" cy="211" rx="6" ry="3"/>
-            <ellipse class="n" cx="72" cy="211" rx="6" ry="3"/>
-          </svg>
-          <figcaption>FRONT</figcaption>
-        </figure>
-        <figure>
-          <svg viewBox="0 0 120 232" aria-label="Back muscles">
-            <circle class="n" cx="60" cy="16" r="11"/>
-            <path class="m" data-m="upper_back" d="M50,46 L70,46 L67,66 L53,66 Z"/>
-            <path class="m" data-m="traps" d="M60,27 L47,40 L54,46 L60,64 L66,46 L73,40 Z"/>
-            <ellipse class="m" data-m="rear_delts" cx="40" cy="45" rx="8.5" ry="7.5"/>
-            <ellipse class="m" data-m="rear_delts" cx="80" cy="45" rx="8.5" ry="7.5"/>
-            <ellipse class="m" data-m="side_delts" cx="33" cy="49" rx="4" ry="7"/>
-            <ellipse class="m" data-m="side_delts" cx="87" cy="49" rx="4" ry="7"/>
-            <path class="m" data-m="lats" d="M51,54 L44,52 Q39,70 47,90 L57,84 L57,68 Z"/>
-            <path class="m" data-m="lats" d="M69,54 L76,52 Q81,70 73,90 L63,84 L63,68 Z"/>
-            <ellipse class="m" data-m="triceps" cx="33" cy="66" rx="5.5" ry="11"/>
-            <ellipse class="m" data-m="triceps" cx="87" cy="66" rx="5.5" ry="11"/>
-            <ellipse class="m" data-m="forearms" cx="29" cy="91" rx="4.5" ry="12" transform="rotate(8 29 91)"/>
-            <ellipse class="m" data-m="forearms" cx="91" cy="91" rx="4.5" ry="12" transform="rotate(-8 91 91)"/>
-            <circle class="n" cx="26" cy="108" r="4"/>
-            <circle class="n" cx="94" cy="108" r="4"/>
-            <rect class="m" data-m="lower_back" x="52" y="84" width="16" height="17" rx="4"/>
-            <ellipse class="m" data-m="glutes" cx="51" cy="112" rx="9.5" ry="10"/>
-            <ellipse class="m" data-m="glutes" cx="69" cy="112" rx="9.5" ry="10"/>
-            <ellipse class="m" data-m="hamstrings" cx="50" cy="143" rx="8.5" ry="20"/>
-            <ellipse class="m" data-m="hamstrings" cx="70" cy="143" rx="8.5" ry="20"/>
-            <circle class="n" cx="50" cy="166" r="4.5"/>
-            <circle class="n" cx="70" cy="166" r="4.5"/>
-            <ellipse class="m" data-m="calves" cx="49" cy="187" rx="7" ry="16"/>
-            <ellipse class="m" data-m="calves" cx="71" cy="187" rx="7" ry="16"/>
-            <ellipse class="n" cx="48" cy="211" rx="6" ry="3"/>
-            <ellipse class="n" cx="72" cy="211" rx="6" ry="3"/>
-          </svg>
-          <figcaption>BACK</figcaption>
-        </figure>
+      <div style="display:flex;justify-content:flex-end;margin:-6px 0 12px">
+        <div class="tr-seg" id="trMapSeg"><button type="button" data-r="7" class="on">This week</button><button type="button" data-r="30">30-day avg</button></div>
       </div>
-      <div class="tr-scale"><span>Less</span><span class="tr-scale-bar"></span><span>More sets</span></div>
-      <div class="tr-musc" id="trMusc"></div>
-      <div class="tr-gap" id="trGap"></div>
+      <div class="bm-stage" id="bmStage">
+        <figure><svg viewBox="0 0 200 430" role="img" aria-label="Front muscles"><g class="bm-outline"><path d="M90,58 L110,58 L113,78 L87,78 Z"/><path d="M89,66 C82,72 72,76 62,80 L80,84 C86,80 89,74 90,70 Z"/><path d="M111 66 C118 72 128 76 138 80 L120 84 C114 80 111 74 110 70 Z"/><path d="M62,80 C50,80 40,88 38,102 C38,112 41,120 46,124 C50,112 56,102 66,94 C70,90 72,86 70,82 Z"/><path d="M138 80 C150 80 160 88 162 102 C162 112 159 120 154 124 C150 112 144 102 134 94 C130 90 128 86 130 82 Z"/><path d="M100,82 L74,84 C64,90 56,100 54,112 C56,124 68,130 82,130 C92,130 98,126 100,122 Z"/><path d="M100 82 L126 84 C136 90 144 100 146 112 C144 124 132 130 118 130 C108 130 102 126 100 122 Z"/><path d="M46,126 C40,134 37,148 38,162 C40,170 44,172 48,170 C54,160 58,146 58,134 C56,126 52,122 46,126 Z"/><path d="M154 126 C160 134 163 148 162 162 C160 170 156 172 152 170 C146 160 142 146 142 134 C144 126 148 122 154 126 Z"/><path d="M38,174 C32,186 28,200 27,214 C28,220 32,222 36,220 C42,206 47,192 50,176 C47,171 41,170 38,174 Z"/><path d="M162 174 C168 186 172 200 173 214 C172 220 168 222 164 220 C158 206 153 192 150 176 C153 171 159 170 162 174 Z"/><path d="M86,132 C80,134 74,138 72,148 C71,164 74,182 82,198 L87,204 L87,136 Z"/><path d="M114 132 C120 134 126 138 128 148 C129 164 126 182 118 198 L113 204 L113 136 Z"/><path d="M91,132 L96.5,132 Q99,132 99,134.5 L99,145.5 Q99,148 96.5,148 L91,148 Q88.5,148 88.5,145.5 L88.5,134.5 Q88.5,132 91,132 Z"/><path d="M109 132 L103.5 132 Q101 132 101 134.5 L101 145.5 Q101 148 103.5 148 L109 148 Q111.5 148 111.5 145.5 L111.5 134.5 Q111.5 132 109 132 Z"/><path d="M91,150.5 L96.5,150.5 Q99,150.5 99,153 L99,164 Q99,166.5 96.5,166.5 L91,166.5 Q88.5,166.5 88.5,164 L88.5,153 Q88.5,150.5 91,150.5 Z"/><path d="M109 150.5 L103.5 150.5 Q101 150.5 101 153 L101 164 Q101 166.5 103.5 166.5 L109 166.5 Q111.5 166.5 111.5 164 L111.5 153 Q111.5 150.5 109 150.5 Z"/><path d="M91,169 L96.5,169 Q99,169 99,171.5 L99,182.5 Q99,185 96.5,185 L91,185 Q88.5,185 88.5,182.5 L88.5,171.5 Q88.5,169 91,169 Z"/><path d="M109 169 L103.5 169 Q101 169 101 171.5 L101 182.5 Q101 185 103.5 185 L109 185 Q111.5 185 111.5 182.5 L111.5 171.5 Q111.5 169 109 169 Z"/><path d="M88.5,188 L99,188 L99,216 C95,213 91,206 88.5,198 Z"/><path d="M111.5 188 L101 188 L101 216 C105 213 109 206 111.5 198 Z"/><path d="M82,202 C88,212 95,222 100,226 C105,222 112,212 118,202 L112,200 L100,218 L88,200 Z"/><path d="M82,206 C72,216 66,234 66,258 C66,282 72,300 80,310 C86,310 90,304 92,294 C96,274 96,250 94,230 C92,218 88,210 82,206 Z"/><path d="M118 206 C128 216 134 234 134 258 C134 282 128 300 120 310 C114 310 110 304 108 294 C104 274 104 250 106 230 C108 218 112 210 118 206 Z"/><path d="M94,228 C98,242 99,258 97,272 C95,264 94,250 93,238 Z"/><path d="M106 228 C102 242 101 258 103 272 C105 264 106 250 107 238 Z"/><path d="M78,312 C84,310 92,312 94,318 C95,326 92,332 86,334 C80,334 76,330 76,322 C76,318 76,314 78,312 Z"/><path d="M122 312 C116 310 108 312 106 318 C105 326 108 332 114 334 C120 334 124 330 124 322 C124 318 124 314 122 312 Z"/><path d="M76,334 C72,352 72,372 76,392 C78,398 82,398 84,392 C86,372 86,352 84,336 Z"/><path d="M124 334 C128 352 128 372 124 392 C122 398 118 398 116 392 C114 372 114 352 116 336 Z"/><path d="M84,334 C88,356 89,380 87,398 L91,398 C93,372 93,350 92,334 Z"/><path d="M116 334 C112 356 111 380 113 398 L109 398 C107 372 107 350 108 334 Z"/><path d="M74,398 C70,404 66,410 68,414 C72,418 88,418 93,415 C94,408 92,402 89,398 Z"/><path d="M126 398 C130 404 134 410 132 414 C128 418 112 418 107 415 C106 408 108 402 111 398 Z"/><path d="M36,222 C30,226 24,232 21,242 C19,250 22,256 27,255 C31,254 33,249 35,246 C34,252 35,258 39,258 C43,257 43,250 43,244 C44,236 42,228 40,223 Z"/><path d="M164 222 C170 226 176 232 179 242 C181 250 178 256 173 255 C169 254 167 249 165 246 C166 252 165 258 161 258 C157 257 157 250 157 244 C156 236 158 228 160 223 Z"/><path d="M100,18 C111,18 118,28 118,40 C118,54 110,64 100,64 C90,64 82,54 82,40 C82,28 89,18 100,18 Z"/></g><g class="bm-skin"><path d="M90,58 L110,58 L113,78 L87,78 Z"/><path d="M89,66 C82,72 72,76 62,80 L80,84 C86,80 89,74 90,70 Z"/><path d="M111 66 C118 72 128 76 138 80 L120 84 C114 80 111 74 110 70 Z"/><path d="M62,80 C50,80 40,88 38,102 C38,112 41,120 46,124 C50,112 56,102 66,94 C70,90 72,86 70,82 Z"/><path d="M138 80 C150 80 160 88 162 102 C162 112 159 120 154 124 C150 112 144 102 134 94 C130 90 128 86 130 82 Z"/><path d="M100,82 L74,84 C64,90 56,100 54,112 C56,124 68,130 82,130 C92,130 98,126 100,122 Z"/><path d="M100 82 L126 84 C136 90 144 100 146 112 C144 124 132 130 118 130 C108 130 102 126 100 122 Z"/><path d="M46,126 C40,134 37,148 38,162 C40,170 44,172 48,170 C54,160 58,146 58,134 C56,126 52,122 46,126 Z"/><path d="M154 126 C160 134 163 148 162 162 C160 170 156 172 152 170 C146 160 142 146 142 134 C144 126 148 122 154 126 Z"/><path d="M38,174 C32,186 28,200 27,214 C28,220 32,222 36,220 C42,206 47,192 50,176 C47,171 41,170 38,174 Z"/><path d="M162 174 C168 186 172 200 173 214 C172 220 168 222 164 220 C158 206 153 192 150 176 C153 171 159 170 162 174 Z"/><path d="M86,132 C80,134 74,138 72,148 C71,164 74,182 82,198 L87,204 L87,136 Z"/><path d="M114 132 C120 134 126 138 128 148 C129 164 126 182 118 198 L113 204 L113 136 Z"/><path d="M91,132 L96.5,132 Q99,132 99,134.5 L99,145.5 Q99,148 96.5,148 L91,148 Q88.5,148 88.5,145.5 L88.5,134.5 Q88.5,132 91,132 Z"/><path d="M109 132 L103.5 132 Q101 132 101 134.5 L101 145.5 Q101 148 103.5 148 L109 148 Q111.5 148 111.5 145.5 L111.5 134.5 Q111.5 132 109 132 Z"/><path d="M91,150.5 L96.5,150.5 Q99,150.5 99,153 L99,164 Q99,166.5 96.5,166.5 L91,166.5 Q88.5,166.5 88.5,164 L88.5,153 Q88.5,150.5 91,150.5 Z"/><path d="M109 150.5 L103.5 150.5 Q101 150.5 101 153 L101 164 Q101 166.5 103.5 166.5 L109 166.5 Q111.5 166.5 111.5 164 L111.5 153 Q111.5 150.5 109 150.5 Z"/><path d="M91,169 L96.5,169 Q99,169 99,171.5 L99,182.5 Q99,185 96.5,185 L91,185 Q88.5,185 88.5,182.5 L88.5,171.5 Q88.5,169 91,169 Z"/><path d="M109 169 L103.5 169 Q101 169 101 171.5 L101 182.5 Q101 185 103.5 185 L109 185 Q111.5 185 111.5 182.5 L111.5 171.5 Q111.5 169 109 169 Z"/><path d="M88.5,188 L99,188 L99,216 C95,213 91,206 88.5,198 Z"/><path d="M111.5 188 L101 188 L101 216 C105 213 109 206 111.5 198 Z"/><path d="M82,202 C88,212 95,222 100,226 C105,222 112,212 118,202 L112,200 L100,218 L88,200 Z"/><path d="M82,206 C72,216 66,234 66,258 C66,282 72,300 80,310 C86,310 90,304 92,294 C96,274 96,250 94,230 C92,218 88,210 82,206 Z"/><path d="M118 206 C128 216 134 234 134 258 C134 282 128 300 120 310 C114 310 110 304 108 294 C104 274 104 250 106 230 C108 218 112 210 118 206 Z"/><path d="M94,228 C98,242 99,258 97,272 C95,264 94,250 93,238 Z"/><path d="M106 228 C102 242 101 258 103 272 C105 264 106 250 107 238 Z"/><path d="M78,312 C84,310 92,312 94,318 C95,326 92,332 86,334 C80,334 76,330 76,322 C76,318 76,314 78,312 Z"/><path d="M122 312 C116 310 108 312 106 318 C105 326 108 332 114 334 C120 334 124 330 124 322 C124 318 124 314 122 312 Z"/><path d="M76,334 C72,352 72,372 76,392 C78,398 82,398 84,392 C86,372 86,352 84,336 Z"/><path d="M124 334 C128 352 128 372 124 392 C122 398 118 398 116 392 C114 372 114 352 116 336 Z"/><path d="M84,334 C88,356 89,380 87,398 L91,398 C93,372 93,350 92,334 Z"/><path d="M116 334 C112 356 111 380 113 398 L109 398 C107 372 107 350 108 334 Z"/><path d="M74,398 C70,404 66,410 68,414 C72,418 88,418 93,415 C94,408 92,402 89,398 Z"/><path d="M126 398 C130 404 134 410 132 414 C128 418 112 418 107 415 C106 408 108 402 111 398 Z"/><path d="M36,222 C30,226 24,232 21,242 C19,250 22,256 27,255 C31,254 33,249 35,246 C34,252 35,258 39,258 C43,257 43,250 43,244 C44,236 42,228 40,223 Z"/><path d="M164 222 C170 226 176 232 179 242 C181 250 178 256 173 255 C169 254 167 249 165 246 C166 252 165 258 161 258 C157 257 157 250 157 244 C156 236 158 228 160 223 Z"/><path d="M100,18 C111,18 118,28 118,40 C118,54 110,64 100,64 C90,64 82,54 82,40 C82,28 89,18 100,18 Z"/></g><path class="bm-n" d="M90,58 L110,58 L113,78 L87,78 Z"/><path class="bm-m" data-g="traps" d="M89,66 C82,72 72,76 62,80 L80,84 C86,80 89,74 90,70 Z"/><path class="bm-m" data-g="traps" d="M111 66 C118 72 128 76 138 80 L120 84 C114 80 111 74 110 70 Z"/><path class="bm-m" data-g="shoulders" d="M62,80 C50,80 40,88 38,102 C38,112 41,120 46,124 C50,112 56,102 66,94 C70,90 72,86 70,82 Z"/><path class="bm-m" data-g="shoulders" d="M138 80 C150 80 160 88 162 102 C162 112 159 120 154 124 C150 112 144 102 134 94 C130 90 128 86 130 82 Z"/><path class="bm-m" data-g="chest" d="M100,82 L74,84 C64,90 56,100 54,112 C56,124 68,130 82,130 C92,130 98,126 100,122 Z"/><path class="bm-m" data-g="chest" d="M100 82 L126 84 C136 90 144 100 146 112 C144 124 132 130 118 130 C108 130 102 126 100 122 Z"/><path class="bm-m" data-g="biceps" d="M46,126 C40,134 37,148 38,162 C40,170 44,172 48,170 C54,160 58,146 58,134 C56,126 52,122 46,126 Z"/><path class="bm-m" data-g="biceps" d="M154 126 C160 134 163 148 162 162 C160 170 156 172 152 170 C146 160 142 146 142 134 C144 126 148 122 154 126 Z"/><path class="bm-m" data-g="forearms" d="M38,174 C32,186 28,200 27,214 C28,220 32,222 36,220 C42,206 47,192 50,176 C47,171 41,170 38,174 Z"/><path class="bm-m" data-g="forearms" d="M162 174 C168 186 172 200 173 214 C172 220 168 222 164 220 C158 206 153 192 150 176 C153 171 159 170 162 174 Z"/><path class="bm-m" data-g="obliques" d="M86,132 C80,134 74,138 72,148 C71,164 74,182 82,198 L87,204 L87,136 Z"/><path class="bm-m" data-g="obliques" d="M114 132 C120 134 126 138 128 148 C129 164 126 182 118 198 L113 204 L113 136 Z"/><path class="bm-m" data-g="abs" d="M91,132 L96.5,132 Q99,132 99,134.5 L99,145.5 Q99,148 96.5,148 L91,148 Q88.5,148 88.5,145.5 L88.5,134.5 Q88.5,132 91,132 Z"/><path class="bm-m" data-g="abs" d="M109 132 L103.5 132 Q101 132 101 134.5 L101 145.5 Q101 148 103.5 148 L109 148 Q111.5 148 111.5 145.5 L111.5 134.5 Q111.5 132 109 132 Z"/><path class="bm-m" data-g="abs" d="M91,150.5 L96.5,150.5 Q99,150.5 99,153 L99,164 Q99,166.5 96.5,166.5 L91,166.5 Q88.5,166.5 88.5,164 L88.5,153 Q88.5,150.5 91,150.5 Z"/><path class="bm-m" data-g="abs" d="M109 150.5 L103.5 150.5 Q101 150.5 101 153 L101 164 Q101 166.5 103.5 166.5 L109 166.5 Q111.5 166.5 111.5 164 L111.5 153 Q111.5 150.5 109 150.5 Z"/><path class="bm-m" data-g="abs" d="M91,169 L96.5,169 Q99,169 99,171.5 L99,182.5 Q99,185 96.5,185 L91,185 Q88.5,185 88.5,182.5 L88.5,171.5 Q88.5,169 91,169 Z"/><path class="bm-m" data-g="abs" d="M109 169 L103.5 169 Q101 169 101 171.5 L101 182.5 Q101 185 103.5 185 L109 185 Q111.5 185 111.5 182.5 L111.5 171.5 Q111.5 169 109 169 Z"/><path class="bm-m" data-g="abs" d="M88.5,188 L99,188 L99,216 C95,213 91,206 88.5,198 Z"/><path class="bm-m" data-g="abs" d="M111.5 188 L101 188 L101 216 C105 213 109 206 111.5 198 Z"/><path class="bm-n" d="M82,202 C88,212 95,222 100,226 C105,222 112,212 118,202 L112,200 L100,218 L88,200 Z"/><path class="bm-m" data-g="quads" d="M82,206 C72,216 66,234 66,258 C66,282 72,300 80,310 C86,310 90,304 92,294 C96,274 96,250 94,230 C92,218 88,210 82,206 Z"/><path class="bm-m" data-g="quads" d="M118 206 C128 216 134 234 134 258 C134 282 128 300 120 310 C114 310 110 304 108 294 C104 274 104 250 106 230 C108 218 112 210 118 206 Z"/><path class="bm-m" data-g="quads" d="M94,228 C98,242 99,258 97,272 C95,264 94,250 93,238 Z"/><path class="bm-m" data-g="quads" d="M106 228 C102 242 101 258 103 272 C105 264 106 250 107 238 Z"/><path class="bm-n" d="M78,312 C84,310 92,312 94,318 C95,326 92,332 86,334 C80,334 76,330 76,322 C76,318 76,314 78,312 Z"/><path class="bm-n" d="M122 312 C116 310 108 312 106 318 C105 326 108 332 114 334 C120 334 124 330 124 322 C124 318 124 314 122 312 Z"/><path class="bm-m" data-g="calves" d="M76,334 C72,352 72,372 76,392 C78,398 82,398 84,392 C86,372 86,352 84,336 Z"/><path class="bm-m" data-g="calves" d="M124 334 C128 352 128 372 124 392 C122 398 118 398 116 392 C114 372 114 352 116 336 Z"/><path class="bm-n" d="M84,334 C88,356 89,380 87,398 L91,398 C93,372 93,350 92,334 Z"/><path class="bm-n" d="M116 334 C112 356 111 380 113 398 L109 398 C107 372 107 350 108 334 Z"/><path class="bm-n" d="M74,398 C70,404 66,410 68,414 C72,418 88,418 93,415 C94,408 92,402 89,398 Z"/><path class="bm-n" d="M126 398 C130 404 134 410 132 414 C128 418 112 418 107 415 C106 408 108 402 111 398 Z"/><path class="bm-n" d="M36,222 C30,226 24,232 21,242 C19,250 22,256 27,255 C31,254 33,249 35,246 C34,252 35,258 39,258 C43,257 43,250 43,244 C44,236 42,228 40,223 Z"/><path class="bm-n" d="M164 222 C170 226 176 232 179 242 C181 250 178 256 173 255 C169 254 167 249 165 246 C166 252 165 258 161 258 C157 257 157 250 157 244 C156 236 158 228 160 223 Z"/><path class="bm-n" d="M100,18 C111,18 118,28 118,40 C118,54 110,64 100,64 C90,64 82,54 82,40 C82,28 89,18 100,18 Z"/><g class="bm-line"><path d="M80,216 C77,242 79,272 86,304"/><path d="M120 216 C123 242 121 272 114 304"/><path d="M100,84 L100,124"/><path d="M60,110 C64,118 72,124 80,126"/><path d="M140 110 C136 118 128 124 120 126"/></g></svg><figcaption>FRONT</figcaption></figure>
+        <figure><svg viewBox="0 0 200 430" role="img" aria-label="Back muscles"><g class="bm-outline"><path d="M90,58 L110,58 L112,74 L88,74 Z"/><path d="M74,92 C82,96 88,102 90,110 L88,126 C80,124 72,118 68,108 C68,100 70,94 74,92 Z"/><path d="M126 92 C118 96 112 102 110 110 L112 126 C120 124 128 118 132 108 C132 100 130 94 126 92 Z"/><path d="M68,110 C72,124 82,132 94,134 L96,142 L93,178 C89,183 84,183 80,178 C74,162 70,142 66,124 Z"/><path d="M132 110 C128 124 118 132 106 134 L104 142 L107 178 C111 183 116 183 120 178 C126 162 130 142 134 124 Z"/><path d="M100,56 C94,62 86,68 76,74 L64,80 C76,84 86,90 91,100 L100,134 L109,100 C114,90 124,84 136,80 L124,74 C114,68 106,62 100,56 Z"/><path d="M62,80 C50,80 40,88 38,102 C38,112 41,120 46,124 C52,112 60,102 70,96 C74,92 74,86 70,82 Z"/><path d="M138 80 C150 80 160 88 162 102 C162 112 159 120 154 124 C148 112 140 102 130 96 C126 92 126 86 130 82 Z"/><path d="M46,126 C40,134 37,148 38,162 C40,170 44,172 48,170 C54,160 58,146 58,134 C56,126 52,122 46,126 Z"/><path d="M154 126 C160 134 163 148 162 162 C160 170 156 172 152 170 C146 160 142 146 142 134 C144 126 148 122 154 126 Z"/><path d="M38,174 C32,186 28,200 27,214 C28,220 32,222 36,220 C42,206 47,192 50,176 C47,171 41,170 38,174 Z"/><path d="M162 174 C168 186 172 200 173 214 C172 220 168 222 164 220 C158 206 153 192 150 176 C153 171 159 170 162 174 Z"/><path d="M95,138 L99.5,140 L99.5,198 C95,198 91,195 89,190 C89,172 91,152 95,138 Z"/><path d="M105 138 L100.5 140 L100.5 198 C105 198 109 195 111 190 C111 172 109 152 105 138 Z"/><path d="M80,180 C84,184 88,190 88,196 L84,204 C80,198 78,190 78,184 Z"/><path d="M120 180 C116 184 112 190 112 196 L116 204 C120 198 122 190 122 184 Z"/><path d="M100,200 C90,198 80,202 76,214 C72,228 76,242 88,246 C96,246 100,240 100,232 Z"/><path d="M100 200 C110 198 120 202 124 214 C128 228 124 242 112 246 C104 246 100 240 100 232 Z"/><path d="M78,248 C72,266 70,286 74,304 C78,312 84,314 88,310 C92,292 94,272 96,250 C90,250 84,250 78,248 Z"/><path d="M122 248 C128 266 130 286 126 304 C122 312 116 314 112 310 C108 292 106 272 104 250 C110 250 116 250 122 248 Z"/><path d="M96,252 C98,268 98,288 93,308 C91,300 92,280 94,262 Z"/><path d="M104 252 C102 268 102 288 107 308 C109 300 108 280 106 262 Z"/><path d="M78,312 C84,310 92,312 94,318 C95,326 92,332 86,334 C80,334 76,330 76,322 C76,318 76,314 78,312 Z"/><path d="M122 312 C116 310 108 312 106 318 C105 326 108 332 114 334 C120 334 124 330 124 322 C124 318 124 314 122 312 Z"/><path d="M74,334 C68,348 68,366 74,378 C78,386 84,386 87,378 C91,362 92,346 88,334 Z"/><path d="M126 334 C132 348 132 366 126 378 C122 386 116 386 113 378 C109 362 108 346 112 334 Z"/><path d="M77,380 C77,388 79,396 81,398 L87,398 C87,390 87,384 87,380 Z"/><path d="M123 380 C123 388 121 396 119 398 L113 398 C113 390 113 384 113 380 Z"/><path d="M74,398 C70,404 66,410 68,414 C72,418 88,418 93,415 C94,408 92,402 89,398 Z"/><path d="M126 398 C130 404 134 410 132 414 C128 418 112 418 107 415 C106 408 108 402 111 398 Z"/><path d="M36,222 C30,226 24,232 21,242 C19,250 22,256 27,255 C31,254 33,249 35,246 C34,252 35,258 39,258 C43,257 43,250 43,244 C44,236 42,228 40,223 Z"/><path d="M164 222 C170 226 176 232 179 242 C181 250 178 256 173 255 C169 254 167 249 165 246 C166 252 165 258 161 258 C157 257 157 250 157 244 C156 236 158 228 160 223 Z"/><path d="M100,18 C111,18 118,28 118,40 C118,54 110,64 100,64 C90,64 82,54 82,40 C82,28 89,18 100,18 Z"/></g><g class="bm-skin"><path d="M90,58 L110,58 L112,74 L88,74 Z"/><path d="M74,92 C82,96 88,102 90,110 L88,126 C80,124 72,118 68,108 C68,100 70,94 74,92 Z"/><path d="M126 92 C118 96 112 102 110 110 L112 126 C120 124 128 118 132 108 C132 100 130 94 126 92 Z"/><path d="M68,110 C72,124 82,132 94,134 L96,142 L93,178 C89,183 84,183 80,178 C74,162 70,142 66,124 Z"/><path d="M132 110 C128 124 118 132 106 134 L104 142 L107 178 C111 183 116 183 120 178 C126 162 130 142 134 124 Z"/><path d="M100,56 C94,62 86,68 76,74 L64,80 C76,84 86,90 91,100 L100,134 L109,100 C114,90 124,84 136,80 L124,74 C114,68 106,62 100,56 Z"/><path d="M62,80 C50,80 40,88 38,102 C38,112 41,120 46,124 C52,112 60,102 70,96 C74,92 74,86 70,82 Z"/><path d="M138 80 C150 80 160 88 162 102 C162 112 159 120 154 124 C148 112 140 102 130 96 C126 92 126 86 130 82 Z"/><path d="M46,126 C40,134 37,148 38,162 C40,170 44,172 48,170 C54,160 58,146 58,134 C56,126 52,122 46,126 Z"/><path d="M154 126 C160 134 163 148 162 162 C160 170 156 172 152 170 C146 160 142 146 142 134 C144 126 148 122 154 126 Z"/><path d="M38,174 C32,186 28,200 27,214 C28,220 32,222 36,220 C42,206 47,192 50,176 C47,171 41,170 38,174 Z"/><path d="M162 174 C168 186 172 200 173 214 C172 220 168 222 164 220 C158 206 153 192 150 176 C153 171 159 170 162 174 Z"/><path d="M95,138 L99.5,140 L99.5,198 C95,198 91,195 89,190 C89,172 91,152 95,138 Z"/><path d="M105 138 L100.5 140 L100.5 198 C105 198 109 195 111 190 C111 172 109 152 105 138 Z"/><path d="M80,180 C84,184 88,190 88,196 L84,204 C80,198 78,190 78,184 Z"/><path d="M120 180 C116 184 112 190 112 196 L116 204 C120 198 122 190 122 184 Z"/><path d="M100,200 C90,198 80,202 76,214 C72,228 76,242 88,246 C96,246 100,240 100,232 Z"/><path d="M100 200 C110 198 120 202 124 214 C128 228 124 242 112 246 C104 246 100 240 100 232 Z"/><path d="M78,248 C72,266 70,286 74,304 C78,312 84,314 88,310 C92,292 94,272 96,250 C90,250 84,250 78,248 Z"/><path d="M122 248 C128 266 130 286 126 304 C122 312 116 314 112 310 C108 292 106 272 104 250 C110 250 116 250 122 248 Z"/><path d="M96,252 C98,268 98,288 93,308 C91,300 92,280 94,262 Z"/><path d="M104 252 C102 268 102 288 107 308 C109 300 108 280 106 262 Z"/><path d="M78,312 C84,310 92,312 94,318 C95,326 92,332 86,334 C80,334 76,330 76,322 C76,318 76,314 78,312 Z"/><path d="M122 312 C116 310 108 312 106 318 C105 326 108 332 114 334 C120 334 124 330 124 322 C124 318 124 314 122 312 Z"/><path d="M74,334 C68,348 68,366 74,378 C78,386 84,386 87,378 C91,362 92,346 88,334 Z"/><path d="M126 334 C132 348 132 366 126 378 C122 386 116 386 113 378 C109 362 108 346 112 334 Z"/><path d="M77,380 C77,388 79,396 81,398 L87,398 C87,390 87,384 87,380 Z"/><path d="M123 380 C123 388 121 396 119 398 L113 398 C113 390 113 384 113 380 Z"/><path d="M74,398 C70,404 66,410 68,414 C72,418 88,418 93,415 C94,408 92,402 89,398 Z"/><path d="M126 398 C130 404 134 410 132 414 C128 418 112 418 107 415 C106 408 108 402 111 398 Z"/><path d="M36,222 C30,226 24,232 21,242 C19,250 22,256 27,255 C31,254 33,249 35,246 C34,252 35,258 39,258 C43,257 43,250 43,244 C44,236 42,228 40,223 Z"/><path d="M164 222 C170 226 176 232 179 242 C181 250 178 256 173 255 C169 254 167 249 165 246 C166 252 165 258 161 258 C157 257 157 250 157 244 C156 236 158 228 160 223 Z"/><path d="M100,18 C111,18 118,28 118,40 C118,54 110,64 100,64 C90,64 82,54 82,40 C82,28 89,18 100,18 Z"/></g><path class="bm-n" d="M90,58 L110,58 L112,74 L88,74 Z"/><path class="bm-m" data-g="back" d="M74,92 C82,96 88,102 90,110 L88,126 C80,124 72,118 68,108 C68,100 70,94 74,92 Z"/><path class="bm-m" data-g="back" d="M126 92 C118 96 112 102 110 110 L112 126 C120 124 128 118 132 108 C132 100 130 94 126 92 Z"/><path class="bm-m" data-g="back" d="M68,110 C72,124 82,132 94,134 L96,142 L93,178 C89,183 84,183 80,178 C74,162 70,142 66,124 Z"/><path class="bm-m" data-g="back" d="M132 110 C128 124 118 132 106 134 L104 142 L107 178 C111 183 116 183 120 178 C126 162 130 142 134 124 Z"/><path class="bm-m" data-g="traps" d="M100,56 C94,62 86,68 76,74 L64,80 C76,84 86,90 91,100 L100,134 L109,100 C114,90 124,84 136,80 L124,74 C114,68 106,62 100,56 Z"/><path class="bm-m" data-g="shoulders" d="M62,80 C50,80 40,88 38,102 C38,112 41,120 46,124 C52,112 60,102 70,96 C74,92 74,86 70,82 Z"/><path class="bm-m" data-g="shoulders" d="M138 80 C150 80 160 88 162 102 C162 112 159 120 154 124 C148 112 140 102 130 96 C126 92 126 86 130 82 Z"/><path class="bm-m" data-g="triceps" d="M46,126 C40,134 37,148 38,162 C40,170 44,172 48,170 C54,160 58,146 58,134 C56,126 52,122 46,126 Z"/><path class="bm-m" data-g="triceps" d="M154 126 C160 134 163 148 162 162 C160 170 156 172 152 170 C146 160 142 146 142 134 C144 126 148 122 154 126 Z"/><path class="bm-m" data-g="forearms" d="M38,174 C32,186 28,200 27,214 C28,220 32,222 36,220 C42,206 47,192 50,176 C47,171 41,170 38,174 Z"/><path class="bm-m" data-g="forearms" d="M162 174 C168 186 172 200 173 214 C172 220 168 222 164 220 C158 206 153 192 150 176 C153 171 159 170 162 174 Z"/><path class="bm-m" data-g="lower_back" d="M95,138 L99.5,140 L99.5,198 C95,198 91,195 89,190 C89,172 91,152 95,138 Z"/><path class="bm-m" data-g="lower_back" d="M105 138 L100.5 140 L100.5 198 C105 198 109 195 111 190 C111 172 109 152 105 138 Z"/><path class="bm-m" data-g="obliques" d="M80,180 C84,184 88,190 88,196 L84,204 C80,198 78,190 78,184 Z"/><path class="bm-m" data-g="obliques" d="M120 180 C116 184 112 190 112 196 L116 204 C120 198 122 190 122 184 Z"/><path class="bm-m" data-g="glutes" d="M100,200 C90,198 80,202 76,214 C72,228 76,242 88,246 C96,246 100,240 100,232 Z"/><path class="bm-m" data-g="glutes" d="M100 200 C110 198 120 202 124 214 C128 228 124 242 112 246 C104 246 100 240 100 232 Z"/><path class="bm-m" data-g="hamstrings" d="M78,248 C72,266 70,286 74,304 C78,312 84,314 88,310 C92,292 94,272 96,250 C90,250 84,250 78,248 Z"/><path class="bm-m" data-g="hamstrings" d="M122 248 C128 266 130 286 126 304 C122 312 116 314 112 310 C108 292 106 272 104 250 C110 250 116 250 122 248 Z"/><path class="bm-m" data-g="hamstrings" d="M96,252 C98,268 98,288 93,308 C91,300 92,280 94,262 Z"/><path class="bm-m" data-g="hamstrings" d="M104 252 C102 268 102 288 107 308 C109 300 108 280 106 262 Z"/><path class="bm-n" d="M78,312 C84,310 92,312 94,318 C95,326 92,332 86,334 C80,334 76,330 76,322 C76,318 76,314 78,312 Z"/><path class="bm-n" d="M122 312 C116 310 108 312 106 318 C105 326 108 332 114 334 C120 334 124 330 124 322 C124 318 124 314 122 312 Z"/><path class="bm-m" data-g="calves" d="M74,334 C68,348 68,366 74,378 C78,386 84,386 87,378 C91,362 92,346 88,334 Z"/><path class="bm-m" data-g="calves" d="M126 334 C132 348 132 366 126 378 C122 386 116 386 113 378 C109 362 108 346 112 334 Z"/><path class="bm-m" data-g="calves" d="M77,380 C77,388 79,396 81,398 L87,398 C87,390 87,384 87,380 Z"/><path class="bm-m" data-g="calves" d="M123 380 C123 388 121 396 119 398 L113 398 C113 390 113 384 113 380 Z"/><path class="bm-n" d="M74,398 C70,404 66,410 68,414 C72,418 88,418 93,415 C94,408 92,402 89,398 Z"/><path class="bm-n" d="M126 398 C130 404 134 410 132 414 C128 418 112 418 107 415 C106 408 108 402 111 398 Z"/><path class="bm-n" d="M36,222 C30,226 24,232 21,242 C19,250 22,256 27,255 C31,254 33,249 35,246 C34,252 35,258 39,258 C43,257 43,250 43,244 C44,236 42,228 40,223 Z"/><path class="bm-n" d="M164 222 C170 226 176 232 179 242 C181 250 178 256 173 255 C169 254 167 249 165 246 C166 252 165 258 161 258 C157 257 157 250 157 244 C156 236 158 228 160 223 Z"/><path class="bm-n" d="M100,18 C111,18 118,28 118,40 C118,54 110,64 100,64 C90,64 82,54 82,40 C82,28 89,18 100,18 Z"/><g class="bm-line"><path d="M100,56 L100,198"/><path d="M82,250 C80,272 80,292 84,308"/><path d="M118 250 C120 272 120 292 116 308"/><path d="M81,336 C80,350 80,364 82,376"/><path d="M119 336 C120 350 120 364 118 376"/></g></svg><figcaption>BACK</figcaption></figure>
+      </div>
+      <div class="bm-count"><b id="bmOn">0</b><span id="bmOnText">of 14 muscle groups on target</span></div>
+      <div class="bm-sel" id="bmSel">Tap a muscle to see its sets.</div>
+      <div class="bm-legend">
+        <div><i style="background:#E4E4E4"></i>Rested</div>
+        <div><i style="background:#4F7FD3"></i>Low · under 6</div>
+        <div><i style="background:#E3923F"></i>Moderate · 6–9.5</div>
+        <div><i style="background:#DB4836"></i>On target · 10+</div>
+      </div>
+      <div class="bm-groups" id="bmGroups"></div>
     </div>
 
     <!-- Last workout -->
@@ -1519,7 +1479,7 @@ img, video, canvas, svg { max-width: 100%; }
     const readLS = (k, f) => { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? f : v; } catch { return f; } };
 
     let workouts = (readLS(CACHE_KEY, {}).workouts) || [];
-    let mapRange = 'last', selMuscle = null, histOpen = false, exOpen = false, lastSync = 0;
+    let mapRange = '7', selMuscle = null, histOpen = false, exOpen = false, lastSync = 0;
 
     function unit() { return LYFTA_UNIT; }
     function toUnit(w, target) {
@@ -1573,7 +1533,6 @@ img, video, canvas, svg { max-width: 100%; }
       [/crunch|sit.?up|plank|leg raise|knee raise|ab wheel|rollout|hollow|v.?up|\babs?\b|toes to bar|dead bug|scissor|flutter/, ['abs'], ['obliques']],
     ];
     const MUSCLE_NAMES = { chest: 'Chest', front_delts: 'Front delts', side_delts: 'Side delts', rear_delts: 'Rear delts', biceps: 'Biceps', triceps: 'Triceps', forearms: 'Forearms', abs: 'Abs', obliques: 'Obliques', traps: 'Traps', upper_back: 'Upper back', lats: 'Lats', lower_back: 'Lower back', glutes: 'Glutes', quads: 'Quads', hamstrings: 'Hamstrings', adductors: 'Adductors', calves: 'Calves' };
-    const MAJOR = ['chest', 'lats', 'upper_back', 'front_delts', 'side_delts', 'biceps', 'triceps', 'quads', 'hamstrings', 'glutes', 'calves', 'abs'];
     const muscleCache = {};
     function musclesFor(name) {
       const k = String(name || '').toLowerCase();
@@ -1714,39 +1673,50 @@ img, video, canvas, svg { max-width: 100%; }
     }
 
     // ---------- Muscle map ----------
-    function muscleScores() {
-      let list;
-      if (mapRange === 'last') list = workouts.length ? [workouts[0]] : [];
-      else list = inRange(daysAgo(Number(mapRange) - 1));
+    // 14 groups, coloured by weekly sets: <6 low, 6–9.5 moderate, 10+ on target.
+    const GROUPS = { chest: 'Chest', shoulders: 'Shoulders', biceps: 'Biceps', triceps: 'Triceps', forearms: 'Forearms', abs: 'Abs', obliques: 'Obliques',
+      traps: 'Traps', back: 'Lats & upper back', lower_back: 'Lower back', glutes: 'Glutes', quads: 'Quads & adductors', hamstrings: 'Hamstrings', calves: 'Calves' };
+    const TO_GROUP = { front_delts: 'shoulders', side_delts: 'shoulders', rear_delts: 'shoulders', lats: 'back', upper_back: 'back', adductors: 'quads' };
+    function groupScores() {
+      const days = Number(mapRange);
+      const list = inRange(daysAgo(days - 1));
       const sc = {};
+      Object.keys(GROUPS).forEach((g) => { sc[g] = 0; });
       list.forEach((w) => (w.exercises || []).forEach((ex) => {
         const n = doneSets(ex).length; if (!n) return;
         const m = musclesFor(ex.excercise_name);
-        m.p.forEach((k) => { sc[k] = (sc[k] || 0) + n; });
-        m.s.forEach((k) => { sc[k] = (sc[k] || 0) + n * 0.5; });
+        // A set counts once per group even if two of its muscles share a group.
+        const add = {};
+        m.p.forEach((k) => { const g = TO_GROUP[k] || k; add[g] = Math.max(add[g] || 0, 1); });
+        m.s.forEach((k) => { const g = TO_GROUP[k] || k; add[g] = Math.max(add[g] || 0, 0.5); });
+        Object.entries(add).forEach(([g, f]) => { if (g in sc) sc[g] += n * f; });
       }));
+      // 30-day view shows the weekly average so the same thresholds apply.
+      if (days > 7) Object.keys(sc).forEach((g) => { sc[g] = sc[g] * 7 / days; });
       return { sc, list };
     }
+    const level = (v) => (v >= 10 ? 'hit' : v >= 6 ? 'mod' : v > 0 ? 'low' : '');
+    const fmtSets = (v) => String(Math.round(v * 2) / 2);
     function renderMap() {
-      const { sc, list } = muscleScores();
-      const max = Math.max(1, ...Object.values(sc));
-      document.querySelectorAll('#trRoot .tr-body .m').forEach((el) => {
-        const v = sc[el.dataset.m] || 0;
-        const t = v / max;
-        el.style.fill = v ? 'rgba(255,107,53,' + (0.22 + 0.78 * t).toFixed(2) + ')' : '';
-        el.classList.toggle('sel', el.dataset.m === selMuscle);
+      const { sc, list } = groupScores();
+      document.querySelectorAll('#bmStage .bm-m').forEach((el) => {
+        el.classList.remove('low', 'mod', 'hit');
+        const lv = level(sc[el.dataset.g] || 0);
+        if (lv) el.classList.add(lv);
+        el.classList.toggle('sel', el.dataset.g === selMuscle);
       });
-      $('trMapSub').textContent = mapRange === 'last'
-        ? (list[0] ? (list[0].title || 'Workout') + ' · ' + relDate(list[0].workout_perform_date).split(' · ')[0] : 'No workouts yet')
-        : list.length + ' workout' + (list.length === 1 ? '' : 's') + ' · sets per muscle';
-      const rows = Object.entries(sc).sort((a, b) => b[1] - a[1]);
-      $('trMusc').innerHTML = rows.length ? rows.slice(0, 8).map(([k, v]) =>
-        '<div class="tr-musc-row"' + (k === selMuscle ? ' style="color:#fff"' : '') + '><span>' + MUSCLE_NAMES[k] + '</span><div class="tr-musc-bar"><i style="width:' + (100 * v / max) + '%"></i></div><b>' + (Math.round(v * 2) / 2) + '</b></div>').join('')
-        : '<div class="tr-msg">Log a workout in Lyfta and the muscles you train light up here.</div>';
-      if (mapRange !== 'last' && list.length) {
-        const missed = MAJOR.filter((k) => !sc[k]).map((k) => MUSCLE_NAMES[k]);
-        $('trGap').innerHTML = missed.length ? 'Not trained in this window: <b>' + missed.join(', ') + '</b>' : 'Every major muscle group hit — nice balance.';
-      } else $('trGap').innerHTML = '';
+      const sets = list.reduce((t, w) => t + wSets(w), 0);
+      $('bmTitle').textContent = mapRange === '7' ? 'Muscle map · this week' : 'Muscle map · 30-day average';
+      $('bmMeta').textContent = 'Last ' + mapRange + ' days · ' + list.length + ' workout' + (list.length === 1 ? '' : 's') + ' · ' + sets + ' sets';
+      const on = Object.values(sc).filter((v) => v >= 10).length;
+      $('bmOn').textContent = on;
+      $('bmOnText').textContent = 'of 14 muscle groups on target' + (mapRange === '7' ? '' : ' (per week)');
+      $('bmSel').innerHTML = selMuscle
+        ? '<b>' + GROUPS[selMuscle] + '</b> · ' + fmtSets(sc[selMuscle]) + ' sets' + (mapRange === '7' ? ' this week' : ' a week') + (sc[selMuscle] < 10 ? ' — ' + fmtSets(10 - sc[selMuscle]) + ' more to hit 10' : ' — on target')
+        : (list.length ? 'Tap a muscle to see its sets.' : 'Log a workout in Lyfta and your muscles light up here.');
+      $('bmGroups').innerHTML = Object.keys(GROUPS).sort((a, b) => sc[b] - sc[a]).map((g) =>
+        '<div class="bm-group' + (g === selMuscle ? ' sel' : '') + '" data-g="' + g + '"><i class="' + level(sc[g]) + '"></i><span>' + GROUPS[g] + '</span><b>' + fmtSets(sc[g]) + '</b></div>').join('');
+      $('bmGroups').querySelectorAll('.bm-group').forEach((el) => el.addEventListener('click', () => { selMuscle = selMuscle === el.dataset.g ? null : el.dataset.g; renderMap(); }));
     }
     $('trMapSeg').addEventListener('click', (e) => {
       const b = e.target.closest('button'); if (!b) return;
@@ -1754,13 +1724,9 @@ img, video, canvas, svg { max-width: 100%; }
       $('trMapSeg').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
       renderMap();
     });
-    document.querySelectorAll('#trRoot .tr-body .m').forEach((el) => el.addEventListener('click', () => {
-      selMuscle = selMuscle === el.dataset.m ? null : el.dataset.m;
+    document.querySelectorAll('#bmStage .bm-m').forEach((el) => el.addEventListener('click', () => {
+      selMuscle = selMuscle === el.dataset.g ? null : el.dataset.g;
       renderMap();
-      if (selMuscle) {
-        const { sc } = muscleScores();
-        $('trMapSub').textContent = MUSCLE_NAMES[selMuscle] + ' · ' + (Math.round((sc[selMuscle] || 0) * 2) / 2) + ' sets';
-      }
     }));
 
     // ---------- Last workout + history ----------

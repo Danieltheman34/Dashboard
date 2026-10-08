@@ -202,7 +202,7 @@ body.topbar-modal-open {
       <span class="topbar-pill-dot"></span>
       <span class="topbar-pill-count" id="topbarWaterCount">0/0</span>
     </a>
-    <button class="topbar-water-add" id="topbarWaterAdd" aria-label="Log one drink" type="button">+</button>
+    <button class="topbar-water-add" id="topbarWaterAdd" aria-label="Log a glass of water (8 oz)" type="button">+</button>
   </div>
   <a href="finance.html" class="topbar-finance-btn" id="topbarFinance" aria-label="Finance">
     <span class="topbar-finance-icon">📊</span>
@@ -217,12 +217,16 @@ body.topbar-modal-open {
     <span>Main</span>
   </a>
   <a href="health.html" class="bottombar-tab" data-page="health">
-    <span class="bottombar-tab-icon">💊</span>
-    <span>Health</span>
+    <span class="bottombar-tab-icon">🥗</span>
+    <span>Food</span>
   </a>
   <a href="gym.html" class="bottombar-tab" data-page="fitness">
     <span class="bottombar-tab-icon">💪</span>
     <span>Fitness</span>
+  </a>
+  <a href="sleep.html" class="bottombar-tab" data-page="sleep">
+    <span class="bottombar-tab-icon">🌙</span>
+    <span>Sleep</span>
   </a>
 </nav>
 `;
@@ -245,6 +249,7 @@ body.topbar-modal-open {
     const p = (window.location.pathname || '').toLowerCase();
     if (p.endsWith('health.html')) return 'health';
     if (p.endsWith('gym.html')) return 'fitness';
+    if (p.endsWith('sleep.html')) return 'sleep';
     return 'main'; // index.html, /, or anything else falls back to main
   }
 
@@ -312,12 +317,17 @@ body.topbar-modal-open {
     return { done, total };
   }
 
-  function getWaterProgress() {
-    let state = null;
-    try { state = JSON.parse(localStorage.getItem('po_water_v1')); } catch (e) {}
-    if (!state) return { done: 0, total: 0 };
-    const todayKey = calendarDateKey();
-    const done = (state.logs || {})[todayKey] || 0;
+  // Water is tracked in fl oz (po_water_v1.unit === 'oz'). Older saves counted
+  // bottles/glasses per day; convert those once, the same way po-water.html does.
+  function waterToOz(state) {
+    if (state.unit === 'oz') return false;
+    const vol = state.unit === 'glass' ? (state.glassMl || 250) : state.unit === 'ml' ? 1 : (state.bottleMl || 500);
+    Object.keys(state.logs || {}).forEach((k) => { state.logs[k] = Math.round((state.logs[k] || 0) * vol / 29.5735); });
+    state.unit = 'oz';
+    return true;
+  }
+  function waterGoalOz(state) {
+    if (state.goalOz > 0) return state.goalOz;
     const p = state.profile || { weightKg: 75 };
     const wKg = state.weightUnit === 'lb' ? (p.weightKg || 0) / 2.20462 : (p.weightKg || 0);
     const base = wKg * 35;
@@ -330,14 +340,15 @@ body.topbar-modal-open {
     let adjust = 0;
     if (p.sex === 'm') adjust += 200;
     if ((p.age || 0) >= 50) adjust += 100;
-    const totalMl = base + exercise + caffeine + subs + adjust;
-    let unitVol;
-    if (state.unit === 'glass') unitVol = state.glassMl || 250;
-    else if (state.unit === 'oz') unitVol = 30;
-    else if (state.unit === 'ml') unitVol = 1;
-    else unitVol = state.bottleMl || 500;
-    const total = Math.max(1, Math.ceil(totalMl / unitVol));
-    return { done, total };
+    return Math.max(32, Math.round((base + exercise + caffeine + subs + adjust) / 29.5735 / 4) * 4);
+  }
+  function getWaterProgress() {
+    let state = null;
+    try { state = JSON.parse(localStorage.getItem('po_water_v1')); } catch (e) {}
+    if (!state) return { done: 0, total: 0 };
+    state.logs = state.logs || {};
+    waterToOz(state);
+    return { done: state.logs[calendarDateKey()] || 0, total: waterGoalOz(state) };
   }
 
   function classifyStatus(done, total) {
@@ -397,9 +408,11 @@ body.topbar-modal-open {
     if (!state || typeof state !== 'object') state = defaultWaterState();
     state.logs = state.logs || {};
     const k = calendarDateKey();
-    state.logs[k] = (state.logs[k] || 0) + 1;
+    waterToOz(state);
+    state.logs[k] = (state.logs[k] || 0) + ((state.sizesOz && state.sizesOz[0]) || 8);
     try { localStorage.setItem('po_water_v1', JSON.stringify(state)); } catch (e) {}
     render();
+    window.dispatchEvent(new Event('water:changed'));
 
     const btn = document.getElementById('topbarWaterAdd');
     if (btn) {
@@ -469,6 +482,7 @@ body.topbar-modal-open {
     // Re-render when localStorage changes from another tab/window OR when
     // the page becomes visible (sync may have pulled in the background).
     window.addEventListener('storage', render);
+    window.addEventListener('water:changed', render);
     window.addEventListener('focus', render);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) render(); });
 

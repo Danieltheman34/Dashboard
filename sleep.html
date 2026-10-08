@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script src="/api/config"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0E0E10">
+<meta name="color-scheme" content="dark">
+<title>Sleep</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="sync.js" defer></script>
+<script src="topbar.js" defer></script>
+<!-- =============================================================
+     SLEEP — nights from Apple Health (sent by an iPhone Shortcut to
+     /api/sleep, stored in the app_state 'sleep_data' row) plus nights
+     logged by hand.
+     Storage (localStorage):
+       sleep:goal    → hours (cloud-synced, 'sleep' row)
+       sleep:manual  → { 'YYYY-MM-DD': { bed:'HH:MM', wake:'HH:MM' } } (synced)
+       sleep:token   → secret the Shortcut sends (synced)
+       sleep:cache   → last copy of sleep_data (this device only)
+     A night is keyed by the date you woke up.
+     ============================================================= -->
+<style>
+:root {
+  --bg: #0E0E10;
+  --card: #1A1A1C;
+  --card-2: #202022;
+  --line: rgba(255, 255, 255, 0.06);
+  --line-2: rgba(255, 255, 255, 0.10);
+  --ink: #EFE9DF;
+  --dim: #A39C90;
+  --mute: #6E6A63;
+  --gold: #D9B98A;
+  --gold-hi: #EAD7B0;
+  --deep: #8C6F45;
+  --rem: #C9A56E;
+  --core: #E6D2AC;
+  --awake: #6E6A63;
+  --serif: 'Instrument Serif', 'Iowan Old Style', Georgia, serif;
+  --sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: var(--bg); color: var(--dim); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
+body { min-height: 100vh; overflow-x: hidden; }
+body::before { content: ''; position: fixed; inset: 0; pointer-events: none; background: radial-gradient(55% 40% at 85% 0%, rgba(217,185,138,0.10), transparent 65%), radial-gradient(50% 40% at 0% 100%, rgba(217,185,138,0.05), transparent 60%); }
+main { position: relative; max-width: 760px; margin: 0 auto; padding: 28px 16px 60px; }
+
+.eyebrow { font-size: 11.5px; font-weight: 600; letter-spacing: 0.26em; text-transform: uppercase; color: var(--dim); }
+.head { margin: 8px 0 22px; }
+.head h1 { font-family: var(--serif); font-style: italic; font-weight: 400; font-size: clamp(44px, 9vw, 62px); color: var(--ink); margin: 6px 0 0; line-height: 1; }
+
+.card { position: relative; background: linear-gradient(180deg, #1C1C1E, #161618); border: 1px solid var(--line); border-radius: 22px; padding: 22px; margin-bottom: 14px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.03), 0 20px 50px rgba(0,0,0,0.35); }
+.card-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+.legend { font-size: 13.5px; color: var(--dim); display: inline-flex; align-items: center; gap: 10px; }
+.legend i { width: 22px; border-top: 2px dashed var(--gold); opacity: 0.8; }
+
+/* Last night */
+.ln { display: grid; grid-template-columns: 1fr auto; gap: 10px 18px; align-items: end; }
+.ln-num { font-family: var(--serif); font-size: clamp(64px, 15vw, 96px); line-height: 0.85; color: var(--ink); letter-spacing: -0.01em; }
+.ln-num small { font-size: 0.45em; color: var(--dim); margin: 0 6px 0 2px; }
+.ln-meta { font-size: 14px; color: var(--dim); margin-top: 12px; line-height: 1.5; }
+.ln-meta b { color: var(--ink); font-weight: 500; }
+.ln-badge { justify-self: end; align-self: start; font-size: 11px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; padding: 7px 12px; border-radius: 999px; border: 1px solid rgba(217,185,138,0.45); color: var(--gold); white-space: nowrap; }
+.ln-badge.low { color: #E59A7A; border-color: rgba(229,154,122,0.45); }
+.stages { margin-top: 20px; }
+.stage-bar { display: flex; height: 12px; border-radius: 999px; overflow: hidden; background: rgba(255,255,255,0.05); gap: 2px; }
+.stage-bar span { height: 100%; transition: width 0.8s cubic-bezier(0.22,1,0.36,1); }
+.stage-legend { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
+.stage-legend div { font-size: 12px; color: var(--dim); }
+.stage-legend b { display: block; font-family: var(--serif); font-weight: 400; font-size: 22px; color: var(--ink); margin-top: 2px; }
+.stage-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; }
+@media (max-width: 460px) { .stage-legend { grid-template-columns: repeat(2, 1fr); } }
+
+/* Chart */
+.seg { display: inline-flex; padding: 3px; border-radius: 999px; border: 1px solid var(--line-2); }
+.seg button { border: 0; background: none; color: var(--dim); font-family: var(--sans); font-size: 11.5px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; padding: 7px 12px; border-radius: 999px; cursor: pointer; }
+.seg button.on { background: rgba(217,185,138,0.16); color: var(--gold-hi); }
+.chart { position: relative; height: 320px; margin: 8px 0 0 40px; }
+.grid-line { position: absolute; left: 0; right: 0; border-top: 1px solid rgba(255,255,255,0.06); }
+.grid-line span { position: absolute; left: -40px; top: -11px; width: 32px; text-align: right; font-size: 15px; color: var(--mute); }
+.goal-line { position: absolute; left: 0; right: 0; border-top: 2px dashed rgba(217,185,138,0.7); z-index: 2; pointer-events: none; }
+.goal-line .gl-l { position: absolute; left: 12px; bottom: 8px; font-size: 13.5px; font-weight: 700; letter-spacing: 0.22em; color: var(--gold); }
+.goal-line .gl-r { position: absolute; right: 0; bottom: 6px; font-size: 26px; font-weight: 600; color: var(--gold); letter-spacing: 0.01em; white-space: nowrap; }
+.bars { position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: space-around; gap: var(--gap, 12px); padding: 0 6px; }
+.bar { flex: 1; max-width: 68px; border-radius: 9px 9px 7px 7px; min-height: 2px; position: relative; cursor: pointer; transition: height 0.8s cubic-bezier(0.22,1,0.36,1), filter 0.2s;
+  background: linear-gradient(180deg, rgba(217,185,138,var(--a, 0.42)), rgba(217,185,138,0.06)); }
+.bar.hit { --a: 0.62; }
+.bar.latest { background: linear-gradient(180deg, #EBD9B4, #6B5A40); box-shadow: 0 0 26px rgba(234,215,176,0.35), 0 0 4px rgba(234,215,176,0.4); }
+.bar.empty { background: rgba(255,255,255,0.04); }
+.bar:hover { filter: brightness(1.15); }
+.bar .tip { position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%); background: #2A2A2C; border: 1px solid var(--line-2); color: var(--ink); font-size: 12px; padding: 5px 8px; border-radius: 8px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.15s; z-index: 3; }
+.bar:hover .tip, .bar.sel .tip { opacity: 1; }
+.xlabels { display: flex; justify-content: space-around; gap: var(--gap, 12px); margin: 16px 0 0 40px; padding: 0 6px; }
+.xlabels span { flex: 1; max-width: 68px; text-align: center; font-size: 15px; letter-spacing: 0.14em; color: var(--mute); }
+.xlabels span.today { color: var(--dim); }
+.avg { margin-top: 26px; font-size: 15px; color: var(--dim); }
+.avg b { color: var(--ink); font-weight: 500; }
+@media (max-width: 520px) {
+  .chart { height: 240px; margin-left: 30px; }
+  .grid-line span { left: -32px; width: 26px; font-size: 12px; }
+  .xlabels { margin-left: 30px; } .xlabels span { font-size: 11px; letter-spacing: 0.08em; }
+  .goal-line .gl-l { font-size: 11px; } .goal-line .gl-r { font-size: 20px; }
+}
+
+/* Rhythm */
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.stat { background: rgba(255,255,255,0.025); border: 1px solid var(--line); border-radius: 14px; padding: 14px 12px; }
+.stat b { display: block; font-family: var(--serif); font-weight: 400; font-size: 30px; color: var(--ink); line-height: 1; }
+.stat span { display: block; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--mute); margin-top: 8px; }
+@media (max-width: 560px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+
+.actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.btn { padding: 15px; border-radius: 15px; border: 1px solid var(--line-2); background: var(--card); color: var(--ink); font-family: var(--sans); font-size: 14.5px; font-weight: 600; cursor: pointer; }
+.btn.gold { border: 0; background: linear-gradient(180deg, #EAD7B0, #C9A56E); color: #2A1E0C; }
+.btn:active { transform: scale(0.99); }
+
+/* Setup */
+.setup summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.setup summary::-webkit-details-marker { display: none; }
+.setup summary .st { font-size: 14px; color: var(--dim); }
+.setup summary .st b { color: var(--ink); font-weight: 500; }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--mute); margin-right: 8px; }
+.dot.on { background: #8FD6A5; box-shadow: 0 0 8px rgba(143,214,165,0.6); }
+.steps { margin: 18px 0 0; padding-left: 22px; display: grid; gap: 12px; font-size: 14px; line-height: 1.55; color: var(--dim); }
+.steps b { color: var(--ink); font-weight: 600; }
+.steps code, .copy-row code { font-family: var(--mono); font-size: 12.5px; color: var(--gold-hi); background: rgba(217,185,138,0.08); padding: 2px 6px; border-radius: 6px; word-break: break-all; }
+.copy-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.copy { border: 1px solid var(--line-2); background: none; color: var(--gold); font-family: var(--sans); font-size: 12px; font-weight: 600; padding: 5px 10px; border-radius: 8px; cursor: pointer; }
+.note { font-size: 12.5px; color: var(--mute); margin-top: 14px; line-height: 1.5; }
+
+/* Sheet */
+.sheet-bg { position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.6); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); display: none; align-items: flex-end; justify-content: center; }
+.sheet-bg.open { display: flex; }
+.sheet { width: 100%; max-width: 480px; background: #18181A; border: 1px solid var(--line-2); border-bottom: 0; border-radius: 24px 24px 0 0; padding: 20px 20px calc(20px + env(safe-area-inset-bottom)); }
+@media (min-width: 640px) { .sheet-bg { align-items: center; } .sheet { border-radius: 24px; border-bottom: 1px solid var(--line-2); } }
+.sheet h3 { font-family: var(--serif); font-style: italic; font-weight: 400; font-size: 30px; color: var(--ink); margin: 0 0 16px; }
+.field { display: block; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--mute); margin-bottom: 12px; }
+.field input { display: block; width: 100%; margin-top: 6px; padding: 12px; border-radius: 12px; border: 1px solid var(--line-2); background: rgba(0,0,0,0.3); color: var(--ink); font-family: var(--sans); font-size: 16px; color-scheme: dark; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.sheet .btn { width: 100%; margin-top: 6px; }
+.sheet .hint { font-size: 12.5px; color: var(--mute); margin: -4px 0 12px; }
+</style>
+</head>
+<body>
+<main>
+  <div class="head">
+    <div class="eyebrow">Sleep · Recovery</div>
+    <h1 id="title">Last night</h1>
+  </div>
+
+  <div class="card" id="lastCard">
+    <div class="ln">
+      <div>
+        <div class="ln-num" id="lnNum">—</div>
+        <div class="ln-meta" id="lnMeta">No sleep data yet.</div>
+      </div>
+      <span class="ln-badge" id="lnBadge" hidden></span>
+    </div>
+    <div class="stages" id="stages" hidden>
+      <div class="stage-bar" id="stageBar"></div>
+      <div class="stage-legend" id="stageLegend"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <div class="eyebrow" id="chartTitle">Sleep · 7 nights</div>
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+        <span class="legend"><i></i><span id="legendText">8h goal</span></span>
+        <div class="seg" id="rangeSeg"><button type="button" data-n="7" class="on">7</button><button type="button" data-n="30">30</button></div>
+      </div>
+    </div>
+    <div class="chart" id="chart"></div>
+    <div class="xlabels" id="xlabels"></div>
+    <div class="avg" id="avg"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><div class="eyebrow">Rhythm · last 7 nights</div></div>
+    <div class="stats" id="stats"></div>
+  </div>
+
+  <div class="actions">
+    <button class="btn gold" id="logBtn" type="button">Log a night</button>
+    <button class="btn" id="goalBtn" type="button">Sleep goal</button>
+  </div>
+
+  <details class="card setup" id="setup">
+    <summary><span class="eyebrow">Apple Watch</span><span class="st" id="syncStatus"><span class="dot"></span>Not connected</span></summary>
+    <ol class="steps">
+      <li>Your Apple Watch saves sleep to <b>Apple Health</b> on your iPhone. A Shortcut sends it here every morning. Set it up once in the <b>Shortcuts</b> app.</li>
+      <li>Tap <b>+</b> to make a new shortcut, name it <b>Send Sleep</b>, and add <b>Find Health Samples</b>. Set Type to <b>Sleep Analysis</b>, add the filter <b>Start Date is in the last 2 days</b>, and sort by <b>Start Date</b>.</li>
+      <li>Add <b>Repeat with Each</b> (it uses the Health Samples). Inside the repeat, add a <b>Text</b> action and build:<br>
+        <code>Start Date|End Date|Value</code><br>
+        using the <b>Repeat Item</b> variable each time (tap it to pick Start Date, End Date and Value). Tap the Start Date and End Date variables and set <b>Date Format → ISO 8601</b> with <b>Include ISO 8601 Time</b> on. Keep the <code>|</code> characters between them.</li>
+      <li>After <b>End Repeat</b>, add <b>Combine Text</b>: combine <b>Repeat Results</b> with <b>New Lines</b>.</li>
+      <li>Add <b>Get Contents of URL</b> with this URL:
+        <div class="copy-row"><code id="urlCode">—</code><button class="copy" type="button" data-copy="urlCode">Copy</button></div>
+        Tap ▸ to expand it: Method <b>POST</b>, Request Body <b>JSON</b>. Add a Text field <code>token</code> with this value:
+        <div class="copy-row"><code id="tokenCode">—</code><button class="copy" type="button" data-copy="tokenCode">Copy</button></div>
+        Then add a Text field <code>samples</code> set to the <b>Combined Text</b> variable.</li>
+      <li>Add <b>Show Result</b>, then run the shortcut once. Allow Health access when asked. It should say <b>Synced … sleep samples</b>.</li>
+      <li>To run it daily: in the <b>Automation</b> tab, tap <b>+</b> → <b>Time of Day</b> → 10:00 AM, Daily → <b>Run Immediately</b>, and choose <b>Send Sleep</b>. You can delete the Show Result action once it works.</li>
+    </ol>
+    <div class="note">Nights from Apple Health and nights you log by hand both show up here. If both exist for the same night, your manual entry wins.</div>
+  </details>
+</main>
+
+<div class="sheet-bg" id="sheetBg">
+  <div class="sheet" role="dialog" aria-modal="true" id="sheet"></div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  const GOAL_KEY = 'sleep:goal', MANUAL_KEY = 'sleep:manual', TOKEN_KEY = 'sleep:token', CACHE_KEY = 'sleep:cache';
+  const SUPABASE_URL = window.DASH_SUPABASE_URL || 'https://srajryooffirbroltjmg.supabase.co';
+  const SUPABASE_KEY = window.DASH_SUPABASE_KEY || 'sb_publishable_5142ZwTLF_DkSVRzciNuRA_bHwRAu4c';
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+  const readLS = (k, f) => { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? f : v; } catch { return f; } };
+  const writeLS = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+  const MIN = 60000, HOUR = 3600000;
+
+  function dayKey(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
+  function fmtDur(ms) { const m = Math.round(ms / MIN); return Math.floor(m / 60) + 'h ' + String(m % 60).padStart(2, '0') + 'm'; }
+  function fmtTime(ms) { return new Date(ms).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }); }
+  function goal() { const g = Number(readLS(GOAL_KEY, 8)); return g > 0 ? g : 8; }
+
+  // The Shortcut proves itself with this token; make one the first time.
+  if (!readLS(TOKEN_KEY, null)) {
+    const a = new Uint8Array(12); crypto.getRandomValues(a);
+    writeLS(TOKEN_KEY, Array.from(a, (b) => b.toString(16).padStart(2, '0')).join(''));
+  }
+
+  // ---------- Nights ----------
+  // Union of [start,end] intervals → total ms and merged list.
+  function union(iv) {
+    const s = iv.slice().sort((a, b) => a[0] - b[0]), out = [];
+    for (const x of s) { const l = out[out.length - 1]; if (l && x[0] <= l[1]) l[1] = Math.max(l[1], x[1]); else out.push([x[0], x[1]]); }
+    return { list: out, total: out.reduce((t, x) => t + x[1] - x[0], 0) };
+  }
+  function nightsFromSamples(samples) {
+    const rows = (samples || []).map((s) => [new Date(s[0]).getTime(), new Date(s[1]).getTime(), s[2]]).filter((s) => s[1] > s[0]).sort((a, b) => a[0] - b[0]);
+    // Group into sessions: a new session starts after a 2-hour gap.
+    const sessions = [];
+    for (const r of rows) {
+      const cur = sessions[sessions.length - 1];
+      if (cur && r[0] <= cur.end + 2 * HOUR) { cur.rows.push(r); cur.end = Math.max(cur.end, r[1]); }
+      else sessions.push({ start: r[0], end: r[1], rows: [r] });
+    }
+    const nights = {};
+    for (const s of sessions) {
+      const by = (st) => s.rows.filter((r) => st.includes(r[2])).map((r) => [r[0], r[1]]);
+      const asleep = union(by(['asleep', 'core', 'deep', 'rem']));
+      const inbed = union(by(['inbed']));
+      const total = asleep.total || inbed.total; // iPhone-only tracking records just "In Bed"
+      if (total < 2 * HOUR) continue; // naps
+      const list = asleep.total ? asleep.list : inbed.list;
+      const bed = list[0][0], wake = list[list.length - 1][1];
+      const n = {
+        total, bed, wake, source: 'watch',
+        span: union(by(['inbed', 'asleep', 'core', 'deep', 'rem', 'awake'])).total,
+        deep: union(by(['deep'])).total, core: union(by(['core'])).total, rem: union(by(['rem'])).total, awake: union(by(['awake'])).total,
+      };
+      const k = dayKey(new Date(wake));
+      if (!nights[k] || nights[k].total < total) nights[k] = n;
+    }
+    return nights;
+  }
+  function manualNights() {
+    const out = {};
+    Object.entries(readLS(MANUAL_KEY, {})).forEach(([k, v]) => {
+      if (!v || !v.bed || !v.wake) return;
+      const [y, m, d] = k.split('-').map(Number);
+      const [wh, wm] = v.wake.split(':').map(Number), [bh, bm] = v.bed.split(':').map(Number);
+      const wake = new Date(y, m - 1, d, wh, wm).getTime();
+      let bed = new Date(y, m - 1, d, bh, bm).getTime();
+      if (bed >= wake) bed -= 24 * HOUR;
+      out[k] = { total: wake - bed, bed, wake, span: wake - bed, source: 'manual' };
+    });
+    return out;
+  }
+  let samples = (readLS(CACHE_KEY, {}) || {}).samples || [];
+  let updated = (readLS(CACHE_KEY, {}) || {}).updated || null;
+  function allNights() { return Object.assign(nightsFromSamples(samples), manualNights()); }
+
+  // ---------- Render ----------
+  let range = 7, selKey = null;
+  function render() {
+    const nights = allNights(), g = goal(), gMs = g * HOUR;
+    const keys = Object.keys(nights).sort();
+    const latestKey = keys[keys.length - 1];
+
+    // Last night
+    const showKey = selKey && nights[selKey] ? selKey : latestKey;
+    const n = showKey && nights[showKey];
+    const todayK = dayKey(new Date()), yK = dayKey(addDays(new Date(), -1));
+    $('title').textContent = !n ? 'Last night' : showKey === todayK ? 'Last night' : showKey === yK ? 'Night before' : new Date(n.wake).toLocaleDateString(undefined, { weekday: 'long' }) + ' night';
+    if (n) {
+      const m = Math.round(n.total / MIN);
+      $('lnNum').innerHTML = Math.floor(m / 60) + '<small>h</small>' + String(m % 60).padStart(2, '0') + '<small>m</small>';
+      const eff = n.span ? Math.round(100 * n.total / Math.max(n.span, n.total)) : null;
+      $('lnMeta').innerHTML = '<b>' + fmtTime(n.bed) + '</b> → <b>' + fmtTime(n.wake) + '</b>'
+        + (eff && n.source === 'watch' ? ' · ' + eff + '% efficiency' : '')
+        + ' · ' + (n.source === 'manual' ? 'logged by hand' : 'Apple Watch')
+        + (showKey !== latestKey ? ' · <a href="#" id="backLatest" style="color:var(--gold)">back to latest</a>' : '');
+      const diff = n.total - gMs;
+      $('lnBadge').hidden = false;
+      $('lnBadge').className = 'ln-badge' + (diff < -HOUR ? ' low' : '');
+      $('lnBadge').textContent = diff >= 0 ? 'Goal hit' : fmtDur(-diff).replace(/^0h /, '') + ' short';
+      const st = [['Deep', n.deep, 'var(--deep)'], ['Core', n.core, 'var(--core)'], ['REM', n.rem, 'var(--rem)'], ['Awake', n.awake, 'var(--awake)']];
+      const stTotal = st.reduce((t, x) => t + (x[1] || 0), 0);
+      $('stages').hidden = !stTotal;
+      if (stTotal) {
+        $('stageBar').innerHTML = st.map((x) => x[1] ? '<span style="width:' + (100 * x[1] / stTotal) + '%;background:' + x[2] + '"></span>' : '').join('');
+        $('stageLegend').innerHTML = st.map((x) => '<div><i style="background:' + x[2] + '"></i>' + x[0] + '<b>' + (x[1] ? fmtDur(x[1]) : '—') + '</b></div>').join('');
+      }
+      const back = $('backLatest');
+      if (back) back.onclick = (e) => { e.preventDefault(); selKey = null; render(); };
+    } else {
+      $('lnNum').textContent = '—';
+      $('lnMeta').textContent = 'No sleep data yet — connect your Apple Watch below or log a night.';
+      $('lnBadge').hidden = true; $('stages').hidden = true;
+    }
+
+    // Chart
+    const days = [];
+    for (let i = range - 1; i >= 0; i--) { const d = addDays(new Date(), -i), k = dayKey(d); days.push({ d, k, n: nights[k] }); }
+    const withData = days.filter((x) => x.n);
+    const maxH = Math.max(9, Math.ceil(Math.max(0, ...withData.map((x) => x.n.total / HOUR)) / 3) * 3);
+    const pct = (h) => 100 * h / maxH;
+    let html = '';
+    for (let h = 0; h <= maxH; h += 3) html += '<div class="grid-line" style="bottom:' + pct(h) + '%"><span>' + h + 'h</span></div>';
+    const latestInRange = withData.length ? withData[withData.length - 1] : null;
+    html += '<div class="goal-line" style="bottom:' + pct(g) + '%"><span class="gl-l">' + g + 'H GOAL</span>'
+      + (latestInRange ? '<span class="gl-r">' + fmtDur(latestInRange.n.total) + '</span>' : '') + '</div>';
+    html += '<div class="bars" style="--gap:' + (range > 7 ? '3px' : '12px') + '">' + days.map((x) => {
+      if (!x.n) return '<div class="bar empty" style="height:1%"></div>';
+      const cls = (x === latestInRange ? ' latest' : '') + (x.n.total >= gMs ? ' hit' : '') + (x.k === selKey ? ' sel' : '');
+      return '<div class="bar' + cls + '" data-k="' + x.k + '" style="height:' + pct(x.n.total / HOUR) + '%"><span class="tip">'
+        + esc(x.d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })) + ' · ' + fmtDur(x.n.total) + '</span></div>';
+    }).join('') + '</div>';
+    $('chart').innerHTML = html;
+    $('xlabels').style.setProperty('--gap', range > 7 ? '3px' : '12px');
+    $('xlabels').innerHTML = days.map((x, i) => {
+      const show = range <= 7 || i % 5 === (range - 1) % 5;
+      const lbl = range <= 7 ? x.d.toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase() : x.d.getDate();
+      return '<span class="' + (x.k === dayKey(new Date()) ? 'today' : '') + '">' + (show ? lbl : '') + '</span>';
+    }).join('');
+    $('chart').querySelectorAll('.bar[data-k]').forEach((b) => b.addEventListener('click', () => { selKey = b.dataset.k === selKey ? null : b.dataset.k; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); }));
+    $('chartTitle').textContent = 'Sleep · ' + range + ' nights';
+    const hits = withData.filter((x) => x.n.total >= gMs).length;
+    $('legendText').textContent = g + 'h goal · ' + hits + ' of ' + withData.length + ' nights';
+    $('avg').innerHTML = withData.length ? 'Average <b>' + fmtDur(withData.reduce((t, x) => t + x.n.total, 0) / withData.length) + '</b> a night' : 'No nights in this range yet.';
+
+    // Rhythm (last 7 nights)
+    const wk = [];
+    for (let i = 0; i < 7; i++) { const k = dayKey(addDays(new Date(), -i)); if (nights[k]) wk.push(nights[k]); }
+    // Average clock times around midnight: shift so 6pm–6pm is continuous.
+    const clock = (ms) => { const d = new Date(ms); let m = d.getHours() * 60 + d.getMinutes(); if (m < 18 * 60) m += 24 * 60; return m; };
+    const fmtClock = (m) => { m = Math.round(m) % (24 * 60); const d = new Date(); d.setHours(Math.floor(m / 60), m % 60, 0, 0); return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }); };
+    const avgOf = (arr) => arr.reduce((t, x) => t + x, 0) / arr.length;
+    const sd = (arr) => { const a = avgOf(arr); return Math.sqrt(avgOf(arr.map((x) => (x - a) ** 2))); };
+    if (wk.length) {
+      const beds = wk.map((x) => clock(x.bed)), wakes = wk.map((x) => clock(x.wake));
+      const debt = wk.reduce((t, x) => t + (gMs - x.total), 0);
+      $('stats').innerHTML = stat(fmtClock(avgOf(beds)), 'Avg bedtime') + stat(fmtClock(avgOf(wakes)), 'Avg wake')
+        + stat(wk.length > 1 ? '±' + Math.round(sd(beds)) + 'm' : '—', 'Bedtime spread')
+        + stat((debt > 0 ? '' : '+') + fmtDur(Math.abs(debt)).replace(/ 00m$/, 'h').replace(/^0h /, ''), debt > 0 ? 'Sleep debt' : 'Over goal');
+    } else $('stats').innerHTML = '<div style="grid-column:1/-1;font-size:14px">Your bedtime and wake rhythm shows up after a few nights.</div>';
+
+    // Setup
+    const tok = readLS(TOKEN_KEY, '');
+    $('tokenCode').textContent = tok || '—';
+    $('urlCode').textContent = location.origin + '/api/sleep';
+    const connected = samples.length > 0;
+    $('syncStatus').innerHTML = '<span class="dot' + (connected ? ' on' : '') + '"></span>' + (connected ? 'Synced <b>' + (updated ? relTime(updated) : '') + '</b>' : 'Not connected · tap to set up');
+  }
+  function stat(v, l) { return '<div class="stat"><b>' + esc(v) + '</b><span>' + esc(l) + '</span></div>'; }
+  function relTime(iso) {
+    const s = (Date.now() - new Date(iso).getTime()) / 1000;
+    if (s < 90) return 'just now'; if (s < 3600) return Math.round(s / 60) + ' min ago';
+    if (s < 86400) return Math.round(s / 3600) + 'h ago'; return Math.round(s / 86400) + 'd ago';
+  }
+
+  $('rangeSeg').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    range = Number(b.dataset.n);
+    $('rangeSeg').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+    render();
+  });
+  document.querySelectorAll('.copy').forEach((b) => b.addEventListener('click', async () => {
+    const t = $(b.dataset.copy).textContent;
+    try { await navigator.clipboard.writeText(t); b.textContent = 'Copied'; } catch { b.textContent = 'Select & copy'; }
+    setTimeout(() => { b.textContent = 'Copy'; }, 1600);
+  }));
+
+  // ---------- Sheets ----------
+  const sheetBg = $('sheetBg'), sheet = $('sheet');
+  function openSheet(html) { sheet.innerHTML = html; sheetBg.classList.add('open'); }
+  function closeSheet() { sheetBg.classList.remove('open'); }
+  sheetBg.addEventListener('click', (e) => { if (e.target === sheetBg) closeSheet(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSheet(); });
+
+  $('logBtn').addEventListener('click', () => {
+    const k = selKey || dayKey(new Date());
+    const cur = readLS(MANUAL_KEY, {})[k] || {};
+    openSheet('<h3>Log a night</h3>'
+      + '<label class="field">Woke up on<input type="date" id="fDate" value="' + k + '" max="' + dayKey(new Date()) + '"></label>'
+      + '<div class="row2"><label class="field">Went to sleep<input type="time" id="fBed" value="' + (cur.bed || '23:00') + '"></label>'
+      + '<label class="field">Woke up<input type="time" id="fWake" value="' + (cur.wake || '07:00') + '"></label></div>'
+      + '<div class="hint" id="fHint"></div>'
+      + '<button class="btn gold" id="fSave" type="button">Save night</button>'
+      + (cur.bed ? '<button class="btn" id="fDel" type="button">Remove manual entry</button>' : '')
+      + '<button class="btn" id="fCancel" type="button">Cancel</button>');
+    const hint = () => {
+      const [bh, bm] = $('fBed').value.split(':').map(Number), [wh, wm] = $('fWake').value.split(':').map(Number);
+      let mins = (wh * 60 + wm) - (bh * 60 + bm); if (mins <= 0) mins += 1440;
+      $('fHint').textContent = isNaN(mins) ? '' : fmtDur(mins * MIN) + ' of sleep';
+    };
+    ['fBed', 'fWake'].forEach((id) => $(id).addEventListener('input', hint)); hint();
+    $('fSave').addEventListener('click', () => {
+      const m = readLS(MANUAL_KEY, {});
+      if (!$('fDate').value || !$('fBed').value || !$('fWake').value) return;
+      m[$('fDate').value] = { bed: $('fBed').value, wake: $('fWake').value };
+      writeLS(MANUAL_KEY, m); selKey = $('fDate').value; closeSheet(); render();
+    });
+    if ($('fDel')) $('fDel').addEventListener('click', () => { const m = readLS(MANUAL_KEY, {}); delete m[k]; writeLS(MANUAL_KEY, m); closeSheet(); render(); });
+    $('fCancel').addEventListener('click', closeSheet);
+  });
+  $('goalBtn').addEventListener('click', () => {
+    openSheet('<h3>Sleep goal</h3><label class="field">Hours a night<input type="number" id="gIn" min="4" max="12" step="0.25" value="' + goal() + '"></label>'
+      + '<button class="btn gold" id="gSave" type="button">Save goal</button><button class="btn" id="gCancel" type="button">Cancel</button>');
+    $('gSave').addEventListener('click', () => { const v = parseFloat($('gIn').value); if (v >= 3 && v <= 14) writeLS(GOAL_KEY, v); closeSheet(); render(); });
+    $('gCancel').addEventListener('click', closeSheet);
+  });
+
+  // ---------- Load Apple Health data ----------
+  async function fetchSamples() {
+    if (!window.supabase || String(SUPABASE_URL).indexOf('PASTE-') === 0) return;
+    try {
+      const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      const { data, error } = await supa.from('app_state').select('data').eq('key', 'sleep_data').maybeSingle();
+      if (error || !data || !data.data) return;
+      samples = data.data.samples || []; updated = data.data.updated || null;
+      writeLS(CACHE_KEY, { samples, updated });
+      render();
+    } catch {}
+  }
+
+  window.addEventListener('storage', render);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { fetchSamples(); render(); } });
+  document.addEventListener('DOMContentLoaded', () => {
+    if (typeof initCloudSync === 'function') {
+      initCloudSync({ appKey: 'sleep', syncedKeys: [GOAL_KEY, MANUAL_KEY, TOKEN_KEY], onApplied: () => window.dispatchEvent(new Event('storage')) });
+    }
+    fetchSamples();
+  });
+  render();
+})();
+</script>
+</body>
+</html>
