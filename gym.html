@@ -1275,7 +1275,7 @@ img, video, canvas, svg { max-width: 100%; }
 <body>
 
 <div class="po-shell">
-  <button class="po-day-pill" type="button" id="dayPill" title="Tap to switch the day filter to today's split">
+  <button class="po-day-pill" type="button" id="dayPill" hidden style="display:none">
     <span class="po-day-date" id="dayPillDate">—</span>
     <span class="po-day-sep">·</span>
     <span class="po-day-split" id="dayPillSplit">—</span>
@@ -2305,7 +2305,7 @@ img, video, canvas, svg { max-width: 100%; }
          "Mark done" stamps the day so the past-workouts list shows it
          as a completed session. The volume here also feeds the
          composition estimate at the top of the page. -->
-    <div class="po-sub-section">
+    <div class="po-sub-section" hidden style="display:none">
       <div class="po-sub-title">Today's workout</div>
       <div class="po-tw" id="poTw">
         <div class="po-tw-head">
