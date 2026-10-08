@@ -4,7 +4,7 @@
 <script src="lock.js"></script>
 <script src="/api/config"></script>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0a0a0b">
 <title>Finances</title>
 <link rel="manifest" href="/manifest.webmanifest?v=2">
@@ -1608,8 +1608,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         <div id="netWorthBreakdown" style="font-size:11px;color:var(--text-tertiary);margin-top:4px"></div>
       </div>
       <div style="display:flex;align-items:center;gap:6px">
-        <span style="font-size:11px;color:var(--text-tertiary)">CHF</span>
-        <select id="netWorthCurrency" style="background:var(--bg-card);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;font-family:inherit;cursor:pointer">
+        <select id="netWorthCurrency" aria-label="Currency" style="background:var(--bg-card);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;font-family:inherit;cursor:pointer">
           <option value="CHF">CHF</option>
           <option value="USD">USD</option>
           <option value="EUR">EUR</option>
@@ -1700,7 +1699,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         <div class="quick-add">
           <input type="text" placeholder="Account name" id="bankName" />
           <input type="number" placeholder="Amount" id="bankAmount" step="0.01" />
-          <button class="quick-add-btn" id="bankAddBtn">+</button>
+          <button class="quick-add-btn" id="bankAddBtn" aria-label="Add bank account">+</button>
         </div>
       </div>
       <!-- Stocks / Investments -->
@@ -1710,7 +1709,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         <div class="quick-add">
           <input type="text" placeholder="Stock / fund" id="stocksName" />
           <input type="number" placeholder="Value" id="stocksAmount" step="0.01" />
-          <button class="quick-add-btn" id="stocksAddBtn">+</button>
+          <button class="quick-add-btn" id="stocksAddBtn" aria-label="Add investment">+</button>
         </div>
       </div>
       <!-- Crypto -->
@@ -1720,7 +1719,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         <div class="quick-add">
           <input type="text" placeholder="Coin / wallet" id="cryptoName" />
           <input type="number" placeholder="Value" id="cryptoAmount" step="0.01" />
-          <button class="quick-add-btn" id="cryptoAddBtn">+</button>
+          <button class="quick-add-btn" id="cryptoAddBtn" aria-label="Add crypto holding">+</button>
         </div>
       </div>
       <!-- Other assets -->
@@ -1730,7 +1729,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         <div class="quick-add">
           <input type="text" placeholder="Asset name" id="otherName" />
           <input type="number" placeholder="Value" id="otherAmount" step="0.01" />
-          <button class="quick-add-btn" id="otherAddBtn">+</button>
+          <button class="quick-add-btn" id="otherAddBtn" aria-label="Add other asset">+</button>
         </div>
       </div>
     </div>
@@ -2419,7 +2418,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
   if (currencyEl) {
     const savedCur = storeGet(CURRENCY_KEY);
-    if (savedCur) currencyEl.value = savedCur;
+    currencyEl.value = savedCur || 'USD';
     currencyEl.addEventListener('change', () => {
       storeSet(CURRENCY_KEY, currencyEl.value);
       renderAllNetWorth();

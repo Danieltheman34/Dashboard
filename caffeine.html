@@ -210,7 +210,7 @@ body::after {
         <div class="energy-label">
           <span class="energy-state" id="energyState">Energy</span>
           <span class="energy-when" id="energyWhen">Right now</span>
-          <span class="energy-hint"><span class="dot"></span>Hover / drag the curve</span>
+          <span class="energy-hint"><span class="dot"></span><span class="hint-txt">Hover / drag the curve</span></span>
         </div>
         <div class="energy-desc">Your predicted energy, hour by hour — built from your caffeine, your body clock, and how long you've been awake.</div>
         <div class="seg-toggle" id="modeToggle">
@@ -644,6 +644,9 @@ body::after {
       onApplied:function(){ logs=loadJSON(LOGS_KEY,[]); custom=loadJSON(CUSTOM_KEY,[]); renderResults($('search').value); renderAll(); } });
   }
 })();
+
+  // Phones have no hover — say touch instead.
+  if (window.matchMedia('(pointer: coarse)').matches) document.querySelectorAll('.hint-txt').forEach((e) => { e.textContent = 'Touch & drag the curve'; });
 </script>
 </body>
 </html>

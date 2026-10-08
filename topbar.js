@@ -310,6 +310,7 @@ body.topbar-modal-open {
     const active = currentPageKey();
     document.querySelectorAll('.bottombar-tab').forEach((t) => {
       t.classList.toggle('active', t.getAttribute('data-page') === active);
+      if (t.getAttribute('data-page') === active) t.setAttribute('aria-current', 'page'); else t.removeAttribute('aria-current');
     });
 
     // Reserve room above the fixed bottom bar so page content can scroll
@@ -410,6 +411,7 @@ body.topbar-modal-open {
     const w = getWaterProgress();
     const countEl = document.getElementById('topbarWaterCount');
     if (countEl) countEl.textContent = w.total ? w.done + '/' + w.total : '0/0';
+    waterEl.setAttribute('aria-label', 'Water: ' + w.done + ' of ' + w.total + ' ounces today. Open water page');
     setPillStatus(waterEl, classifyStatus(w.done, w.total));
   }
 
@@ -464,18 +466,10 @@ body.topbar-modal-open {
   // Belt-and-suspenders zoom prevention — iOS Safari sometimes ignores
   // user-scalable=no, so we also kill the gesture events directly.
   function blockGesture(e) { e.preventDefault(); }
-  function lockGestures() {
-    document.addEventListener('gesturestart', blockGesture, { passive: false });
-    document.addEventListener('gesturechange', blockGesture, { passive: false });
-    document.addEventListener('gestureend', blockGesture, { passive: false });
-    // Also kill the iOS double-tap-to-zoom on any tap.
-    let lastTouch = 0;
-    document.addEventListener('touchend', (e) => {
-      const now = Date.now();
-      if (now - lastTouch <= 300) e.preventDefault();
-      lastTouch = now;
-    }, { passive: false });
-  }
+  // Pinch zoom stays on (accessibility). Double-tap zoom is turned off with
+  // CSS touch-action: manipulation in polish.js, so fast repeated taps
+  // (e.g. +water twice) are never swallowed.
+  function lockGestures() {}
 
   // Watch every known modal-bg / overlay class — when any one of them
   // gets `.show` or `.is-open`, lock the body scroll. When the last

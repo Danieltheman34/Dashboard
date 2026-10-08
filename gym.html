@@ -2214,7 +2214,7 @@ img, video, canvas, svg { max-width: 100%; }
     <div class="po-sub-section">
       <div class="po-sub-title">Exercise</div>
       <div class="po-exercise-bar">
-        <select class="po-ex-select" id="exSelect"></select>
+        <select class="po-ex-select" id="exSelect" aria-label="Exercise"></select>
         <button class="po-btn-icon" id="addExBtn" title="Add exercise" aria-label="Add">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         </button>
@@ -2238,9 +2238,9 @@ img, video, canvas, svg { max-width: 100%; }
         <div class="po-field" id="weightField">
           <label id="weightLabel">Weight (lb)</label>
           <div class="po-weight-row">
-            <button class="po-w-btn" id="weightDownBtn" type="button">−</button>
+            <button class="po-w-btn" id="weightDownBtn" aria-label="Decrease weight" type="button">−</button>
             <input type="number" id="weightInput" step="0.5" inputmode="decimal" placeholder="0">
-            <button class="po-w-btn" id="weightUpBtn" type="button">+</button>
+            <button class="po-w-btn" id="weightUpBtn" aria-label="Increase weight" type="button">+</button>
           </div>
         </div>
         <div class="po-field">

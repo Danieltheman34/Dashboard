@@ -68,6 +68,28 @@
     .wt-divider span { font-family: ui-monospace, 'SF Mono', Menlo, monospace !important; font-size: 10.5px !important; letter-spacing: 0.24em !important; font-weight: 500 !important; color: rgba(239,233,223,0.55) !important; }
     .section-title { font-family: ui-monospace, 'SF Mono', Menlo, monospace !important; font-weight: 500 !important; letter-spacing: 0.24em !important; color: rgba(239,233,223,0.55) !important; }
 
+    /* ===== iPhone accessibility ===== */
+    /* Quick taps never wait for double-tap zoom; pinch zoom stays available. */
+    html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
+    /* 16px+ inputs stop iOS from zooming in when a field is tapped. */
+    #exSelect, #search, #customName, #customMg, #netWorthCurrency, #chatInput, .fu-in, .set-input,
+    [id$="Name"]:is(input), [id$="Amount"]:is(input) { font-size: 16px !important; }
+    /* Smallest labels → 11px so they stay readable. */
+    .td-lbl, .dx-eyebrow, .fu-mono, .fu-wk-lbl, .fu-pill, .fu-link, .tr-stat-label, .po-sub-title, .tr-eyebrow, .po-stat-label,
+    .tr-wk-label, .tr-pr, .tr-strip-legend, .wt-legend-item, .po-seg-label, .energy-when, .energy-hint, .section-title, .section-title-text,
+    .nw-stat-label, .nw-chart-label, .nw-chart-delta, .nw-donut-sub, .bot-tab-label, .role, .tag, figcaption, .k, .wt-divider span,
+    .bm-legend, .tr-dow, .tr-status, .fu-seg button, .wt-comp-label, .wt-comp-window, .wt-locked-label, .tr-lift-1rm small { font-size: 11px !important; }
+    /* Bigger touch targets on phones (Apple recommends ~44pt). */
+    @media (pointer: coarse) {
+      .po-seg-btn, .tr-seg button, .fu-seg button, .seg button, .seg-toggle button, .tr-dv-open, .tr-more,
+      #wtEditBtn, #fuTipDone, #fuToastUndo, .copy, #keyToggle, .fin-back-btn, [id$="AddBtn"] { min-height: 40px; }
+      #fuGoalsBtn, #goalLink, .fu-link, #fuTipDone, #fuToastUndo { position: relative; }
+      #fuGoalsBtn::after, #goalLink::after, #fuTipDone::after, #fuToastUndo::after { content: ''; position: absolute; inset: -14px -8px; }
+      [id$="AddBtn"], #keyToggle { min-width: 44px; }
+    }
+    /* Clear focus ring for keyboard / Switch Control users. */
+    :focus-visible { outline: 2px solid rgba(239,233,223,0.85) !important; outline-offset: 2px; border-radius: 8px; }
+
     @media (prefers-reduced-motion: reduce) { ::view-transition-old(root), ::view-transition-new(root) { animation: none; } }
   `;
   const style = document.createElement('style');
@@ -147,5 +169,50 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true });
   else start();
+  document.addEventListener('touchstart', (e) => {
+    const el = e.target && e.target.closest && e.target.closest('input, select, textarea');
+    if (el && parseFloat(getComputedStyle(el).fontSize) < 16) el.style.fontSize = '16px';
+  }, { passive: true, capture: true });
+
+  // ---------- Home-screen app gestures ----------
+  // Installed to the home screen, iOS drops Safari's pull-to-refresh and
+  // swipe-back. Pull down at the top to reload; swipe in from the left
+  // edge to go back.
+  const standalone = navigator.standalone || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+  if (standalone && 'ontouchstart' in window) {
+    const ptr = document.createElement('div');
+    ptr.setAttribute('aria-hidden', 'true');
+    ptr.style.cssText = 'position:fixed;left:50%;top:calc(env(safe-area-inset-top) + 8px);z-index:200;width:36px;height:36px;margin-left:-18px;border-radius:50%;'
+      + 'background:rgba(30,30,32,0.95);border:1px solid rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:center;color:#EFE9DF;'
+      + 'font:600 18px -apple-system,sans-serif;opacity:0;transform:translateY(-60px);transition:opacity .15s;pointer-events:none';
+    ptr.textContent = '↻';
+    let sy = null, sx = null, pull = 0, edge = false;
+    const locked = () => document.body.style.overflow === 'hidden' || document.documentElement.style.overflow === 'hidden';
+    document.addEventListener('touchstart', (e) => {
+      if (e.touches.length !== 1 || locked()) { sy = null; return; }
+      const t = e.touches[0];
+      sx = t.clientX; sy = t.clientY; pull = 0;
+      edge = sx < 22 && history.length > 1;
+      if (!ptr.parentNode && document.body) document.body.appendChild(ptr);
+    }, { passive: true });
+    document.addEventListener('touchmove', (e) => {
+      if (sy == null) return;
+      const t = e.touches[0], dy = t.clientY - sy;
+      if (!edge && window.scrollY <= 0 && dy > 0) {
+        pull = Math.min(120, dy * 0.5);
+        ptr.style.opacity = String(Math.min(1, pull / 60));
+        ptr.style.transform = 'translateY(' + (pull - 60) + 'px) rotate(' + pull * 3 + 'deg)';
+      }
+    }, { passive: true });
+    document.addEventListener('touchend', (e) => {
+      if (sy == null) return;
+      const t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
+      if (edge && dx > 80 && Math.abs(dy) < 50) { history.back(); }
+      else if (pull >= 60) { ptr.style.transform = 'translateY(0) rotate(360deg)'; ptr.style.transition = 'transform .5s linear'; setTimeout(() => location.reload(), 150); return; }
+      ptr.style.opacity = '0'; ptr.style.transform = 'translateY(-60px)';
+      sy = null; edge = false;
+    }, { passive: true });
+  }
+
   window.dxCountUp = (el) => { if (el && !reduce) { delete el.dataset.dxCounted; countUp(el); } };
 })();
