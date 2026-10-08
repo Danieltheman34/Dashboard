@@ -793,8 +793,9 @@ main {
     // Goals were a single {kcal,p,c,f} before gym/rest days existed; treat that as the gym goal.
     function allGoals() {
       const raw = readLS(GOALS_KEY, {});
-      const gym = Object.assign({ kcal: 2900, p: 200, c: 340, f: 85 }, raw.gym || (raw.kcal ? raw : {}));
-      const rest = Object.assign({ kcal: gym.kcal - 400, p: gym.p, c: Math.max(0, gym.c - 100), f: gym.f }, raw.rest || {});
+      // Defaults are Daniel's targets: 2,500 kcal · 190 g protein · 266 g carbs · 75 g fat.
+      const gym = Object.assign({ kcal: 2500, p: 190, c: 266, f: 75 }, raw.gym || (raw.kcal ? raw : {}));
+      const rest = Object.assign({}, gym, raw.rest || {});
       return { gym, rest };
     }
     // Lifted that day (Lyfta cache or the overload coach's logs) → gym day, unless overridden.

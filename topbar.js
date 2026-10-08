@@ -30,6 +30,21 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
 }
+.topbar-back {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 42px; padding: 0 14px 0 10px; margin-right: auto;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 12px;
+  color: #FAFAFA; text-decoration: none;
+  font-family: inherit; font-size: 14px; font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s, transform 0.10s;
+}
+.topbar-back:hover { background: rgba(255, 255, 255, 0.08); }
+.topbar-back:active { transform: scale(0.96); }
+.topbar-back svg { flex-shrink: 0; }
 .topbar-water-wrap {
   display: flex; align-items: stretch;
 }
@@ -137,6 +152,7 @@ body.has-bottombar {
   padding-bottom: calc(72px + env(safe-area-inset-bottom)) !important;
 }
 
+@media (max-width: 360px) { .topbar-back span { display: none; } .topbar-back { padding: 0 10px; } }
 @media (max-width: 480px) {
   .topbar { padding-left: 10px; padding-right: 10px; gap: 6px; }
   .topbar-water-pill { padding: 8px 11px; gap: 6px; }
@@ -197,6 +213,10 @@ body.topbar-modal-open {
   // -------- HTML --------
   const topbarHtml = `
 <header class="topbar" id="topbar" role="navigation" aria-label="Quick actions">
+  <a href="index.html" class="topbar-back" id="topbarBack" aria-label="Back">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+    <span>Back</span>
+  </a>
   <div class="topbar-water-wrap">
     <a href="po-water.html" class="topbar-water-pill" id="topbarWater" aria-label="Water progress">
       <span class="topbar-pill-dot"></span>
@@ -245,6 +265,10 @@ body.topbar-modal-open {
   function shouldShowChrome() {
     return !isFinancePage() && !isEmbedded();
   }
+  function isHomePage() {
+    const p = (window.location.pathname || '').toLowerCase();
+    return p === '/' || p.endsWith('/index.html') || p === '' || p.endsWith('index.html');
+  }
   function currentPageKey() {
     const p = (window.location.pathname || '').toLowerCase();
     if (p.endsWith('health.html')) return 'health';
@@ -269,6 +293,18 @@ body.topbar-modal-open {
     const bottomWrap = document.createElement('div');
     bottomWrap.innerHTML = bottombarHtml.trim();
     document.body.appendChild(bottomWrap.firstChild);
+
+    // Back button: hidden on the home screen. Goes to the previous page when
+    // we came from inside the dashboard, otherwise home.
+    const back = document.getElementById('topbarBack');
+    if (back) {
+      if (isHomePage()) back.remove();
+      else back.addEventListener('click', (e) => {
+        let internal = false;
+        try { internal = !!document.referrer && new URL(document.referrer).origin === location.origin; } catch (err) {}
+        if (internal && history.length > 1) { e.preventDefault(); history.back(); }
+      });
+    }
 
     // Highlight the active bottom tab.
     const active = currentPageKey();
@@ -327,6 +363,7 @@ body.topbar-modal-open {
     return true;
   }
   function waterGoalOz(state) {
+    if (state.goalOz === undefined) return 110; // Daniel's daily target until changed on the Water page
     if (state.goalOz > 0) return state.goalOz;
     const p = state.profile || { weightKg: 75 };
     const wKg = state.weightUnit === 'lb' ? (p.weightKg || 0) / 2.20462 : (p.weightKg || 0);

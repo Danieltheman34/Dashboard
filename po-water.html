@@ -185,6 +185,8 @@ main { position: relative; max-width: 820px; margin: 0 auto; padding: 28px 16px 
     if (s.caffeineMgPerDay == null) s.caffeineMgPerDay = 200;
     s.substances = Array.isArray(s.substances) ? s.substances : [];
     s.sizesOz = Array.isArray(s.sizesOz) && s.sizesOz.length === 3 ? s.sizesOz : [8, 16, 64];
+    // Daily target is 110 oz until changed (null means "Automatic").
+    if (s.goalOz === undefined) s.goalOz = 110;
     const wasOz = s.unit === 'oz';
     toOz(s);
     if (!wasOz) save(s);
