@@ -4,7 +4,6 @@
 //   • Instrument Serif + shared classes: .dx-eyebrow, .dx-title, .dx-sec
 //   • page fade between pages (View Transitions) and cards rising in
 //   • bars filling, chart columns growing, rings sweeping on first load
-//   • hero numbers counting up from 0 (see COUNT below)
 // The intro effects only run during the first ~1.6 s after a page
 // opens, so later re-renders (logging a meal, adding water) stay instant.
 // ============================================================
@@ -33,15 +32,15 @@
     ::view-transition-new(root) { animation: dxIn 0.32s ${EASE} both; }
     @keyframes dxOut { to { opacity: 0; } }
     @keyframes dxIn { from { opacity: 0; } }
-    @keyframes dxRise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+    @keyframes dxRise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
     @keyframes dxGrowX { from { transform: scaleX(0); } }
     @keyframes dxGrowY { from { transform: scaleY(0); } }
 
-    html.dx-intro :is(${CARDS}) { animation: dxRise 0.6s ${EASE} both; }
-    ${Array.from({ length: 10 }, (_, i) => `html.dx-intro :is(${CARDS}):nth-child(${i + 2}) { animation-delay: ${(i + 1) * 0.05}s; }`).join('\n    ')}
-    html.dx-intro :is(.fu-fill, .fu-mbar i, .fill, .bar-fill, .dx-bar i, .gm-bar i) { transform-origin: left center; animation: dxGrowX 1.1s ${EASE} 0.15s both; }
-    html.dx-intro .bars > * { transform-origin: center bottom; animation: dxGrowY 0.9s ${EASE} both; }
-    ${Array.from({ length: 14 }, (_, i) => `html.dx-intro .bars > *:nth-child(${i + 1}) { animation-delay: ${0.15 + i * 0.035}s; }`).join('\n    ')}
+    html.dx-intro :is(${CARDS}) { animation: dxRise 0.45s ${EASE} both; }
+    ${Array.from({ length: 10 }, (_, i) => `html.dx-intro :is(${CARDS}):nth-child(${i + 2}) { animation-delay: ${(i + 1) * 0.03}s; }`).join('\n    ')}
+    html.dx-intro :is(.fu-fill, .fu-mbar i, .fill, .bar-fill, .dx-bar i, .gm-bar i) { transform-origin: left center; animation: dxGrowX 0.7s ${EASE} 0.1s both; }
+    html.dx-intro .bars > * { transform-origin: center bottom; animation: dxGrowY 0.6s ${EASE} both; }
+    ${Array.from({ length: 14 }, (_, i) => `html.dx-intro .bars > *:nth-child(${i + 1}) { animation-delay: ${0.1 + i * 0.02}s; }`).join('\n    ')}
 
     /* Shared type: small mono eyebrow, big serif title, numbered section rule. */
     .dx-eyebrow { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 10.5px; letter-spacing: 0.24em; text-transform: uppercase; color: rgba(239,233,223,0.55); }
@@ -97,39 +96,6 @@
   style.textContent = css;
   document.head.appendChild(style);
 
-  // ---------- Count-up ----------
-  // Hero numbers on each page. Anything with class "dx-count" counts too.
-  const COUNT = ['.dx-count', '#fuLeft', '#fuEaten', '#num', '#wtNum', '.tr-stat-val', '#trWkWorkouts', '.bm-big', '#lnNum', '.ring-num', '.big-num'];
-  const NUM = /^(\D*?)(\d[\d,]*(?:\.\d+)?)(.*)$/s;
-  function countUp(el) {
-    if (el.dataset.dxCounted) return;
-    // Only plain text (sleep's "7h 32m" has markup — count the first number only when it's simple).
-    if (el.children.length && !el.querySelector('small')) return;
-    const html = el.innerHTML, m = el.textContent.trim().match(NUM);
-    if (!m) return;
-    const raw = m[2], to = parseFloat(raw.replace(/,/g, ''));
-    if (!isFinite(to) || to === 0) return;
-    el.dataset.dxCounted = '1';
-    const dec = (raw.split('.')[1] || '').length, commas = raw.includes(',');
-    const fmt = (v) => { const s = v.toFixed(dec); return commas ? Number(s).toLocaleString(undefined, { minimumFractionDigits: dec, maximumFractionDigits: dec }) : s; };
-    // Replace just the first occurrence of the number in the markup.
-    const idx = html.indexOf(raw);
-    if (idx < 0) return;
-    const pre = html.slice(0, idx), post = html.slice(idx + raw.length);
-    const dur = 900 + Math.min(500, to > 100 ? 400 : 0), t0 = performance.now();
-    let last = '';
-    function frame(t) {
-      // The page re-rendered this number itself → stop and leave it alone.
-      if (last && el.innerHTML !== last) return;
-      const p = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - p, 3);
-      el.innerHTML = last = pre + fmt(to * e) + post;
-      if (p < 1) requestAnimationFrame(frame);
-      else el.innerHTML = html;
-    }
-    requestAnimationFrame(frame);
-  }
-  function runCounts() { document.querySelectorAll(COUNT.join(',')).forEach(countUp); }
-
   // ---------- Rings sweep in ----------
   function runRings() {
     document.querySelectorAll('.ring-fill, .tr-ring-fill, .day-ring-fill, .dx-ring').forEach((el) => {
@@ -142,7 +108,7 @@
       el.style.transition = 'none';
       el.style.strokeDashoffset = len;
       el.getBoundingClientRect();
-      el.style.transition = 'stroke-dashoffset 1.2s ' + EASE;
+      el.style.transition = 'stroke-dashoffset 0.8s ' + EASE;
       el.style.strokeDashoffset = target;
       setTimeout(() => { el.style.transition = prev; }, 1300);
     });
@@ -163,7 +129,6 @@
   function start() {
     addEyebrows();
     if (reduce) return;
-    [120, 600, 1400].forEach((ms) => setTimeout(runCounts, ms));
     setTimeout(runRings, 150);
     setTimeout(() => root.classList.remove('dx-intro'), 1700);
   }
@@ -214,5 +179,4 @@
     }, { passive: true });
   }
 
-  window.dxCountUp = (el) => { if (el && !reduce) { delete el.dataset.dxCounted; countUp(el); } };
 })();

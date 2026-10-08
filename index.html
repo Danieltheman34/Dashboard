@@ -782,9 +782,7 @@ body::after {
     jobs.push(fetch('/api/lyfta?path=/workouts&limit=10&page=1&from=' + TODAY, { cache: 'no-store' })
       .then((r) => r.ok ? r.json() : null).then((j) => { if (j && Array.isArray(j.workouts)) { const ids = new Set(lyfta.map((w) => w.id)); lyfta = j.workouts.filter((w) => !ids.has(w.id)).concat(lyfta); } }).catch(() => {}));
     Promise.all(jobs).then(() => {
-      const ids = ['tdKcal', 'tdWater', 'tdSleep', 'tdLift', 'tdWeight'], before = ids.map((id) => $(id).innerHTML);
       render();
-      ids.forEach((id, i) => { if ($(id).innerHTML !== before[i] && window.dxCountUp) window.dxCountUp($(id)); });
       $('tdUpdated').textContent = new Date().toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
     });
     window.addEventListener('water:changed', render);
