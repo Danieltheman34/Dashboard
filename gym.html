@@ -1319,8 +1319,26 @@ img, video, canvas, svg { max-width: 100%; }
     @media (max-width: 420px) { .tr-stats { grid-template-columns: repeat(2, 1fr); } .tr-minis { grid-template-columns: repeat(2, 1fr); } }
 
     /* Week strip */
-    .tr-strip { display: grid; grid-template-columns: repeat(14, 1fr); gap: 4px; margin-top: 14px; }
-    .tr-day { aspect-ratio: 1; border-radius: 6px; background: rgba(255,255,255,0.04); position: relative; }
+    .tr-strip { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-top: 16px; }
+    .tr-day { aspect-ratio: 1; border-radius: 8px; background: rgba(255,255,255,0.04); position: relative; border: 0; padding: 0; color: var(--text-3); font: 600 12px var(--font-mono); cursor: pointer; display: flex; align-items: center; justify-content: center; -webkit-tap-highlight-color: transparent; }
+    .tr-day.lift, .tr-day.cardio { color: #fff; }
+    .tr-day.future { opacity: 0.35; cursor: default; }
+    .tr-day.sel { box-shadow: 0 0 0 2px var(--bg-card), 0 0 0 4px #fff; }
+    .tr-dow { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-top: 8px; text-align: center; font-size: 10.5px; font-weight: 700; color: var(--text-3); letter-spacing: 0.04em; }
+    .tr-dow span.on { color: var(--text-1, #fff); }
+    .tr-wk-label { grid-column: 1 / -1; font-size: 10px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.12em; font-weight: 700; margin: 4px 0 -2px; }
+    .tr-dayview { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 14px; }
+    .tr-dayview-h { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+    .tr-dv-item { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-top: 1px solid var(--border); }
+    .tr-dv-item:first-of-type { border-top: 0; }
+    .tr-dv-ico { width: 30px; height: 30px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 15px; }
+    .tr-dv-ico.lift { background: rgba(255,107,53,0.18); } .tr-dv-ico.cardio { background: rgba(110,231,183,0.16); }
+    .tr-dv-name { font-size: 14px; font-weight: 600; }
+    .tr-dv-meta { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+    .tr-dv-ex { font-size: 12.5px; color: var(--text-2); margin-top: 6px; line-height: 1.6; }
+    .tr-dv-ex b { color: var(--text-1, #fff); font-weight: 600; }
+    .tr-dv-open { margin-top: 8px; background: none; border: 1px solid var(--border); color: var(--text-2); border-radius: 8px; padding: 6px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+    .tr-dv-empty { font-size: 13px; color: var(--text-3); padding: 6px 0 2px; }
     .tr-day.lift { background: rgba(255,107,53,0.75); }
     .tr-day.cardio { background: rgba(110,231,183,0.45); }
     .tr-day.lift.cardio { background: linear-gradient(135deg, rgba(255,107,53,0.8) 50%, rgba(110,231,183,0.55) 50%); }
@@ -1417,7 +1435,9 @@ img, video, canvas, svg { max-width: 100%; }
         <div class="tr-stat"><div class="tr-stat-val" id="trWkTime">—</div><div class="tr-stat-label">Time</div></div>
       </div>
       <div class="tr-strip" id="trStrip"></div>
-      <div class="tr-strip-legend"><span>2 weeks ago</span><span><i style="background:rgba(255,107,53,0.75)"></i>Lift<i style="background:rgba(110,231,183,0.45)"></i>Cardio</span><span>Today</span></div>
+      <div class="tr-dow" id="trDow"></div>
+      <div class="tr-strip-legend"><span>Tap a day</span><span><i style="background:rgba(255,107,53,0.75)"></i>Lift<i style="background:rgba(110,231,183,0.45)"></i>Cardio</span></div>
+      <div class="tr-dayview" id="trDayView"></div>
     </div>
 
     <!-- Muscle map — sets per muscle group (primary = 1 set, secondary = ½) -->
@@ -1663,13 +1683,65 @@ img, video, canvas, svg { max-width: 100%; }
       $('trWeekTitle').textContent = wk.length ? fmtVol(vol) + ' ' + unit() + ' lifted' : 'No lifts yet this week';
       const liftDays = new Set(workouts.map((w) => dayKey(w.workout_perform_date)));
       const cardioDays = new Set(stravaActs().filter((a) => !isLift(a)).map((a) => a.start_date_local.slice(0, 10)));
+      // Last week and this week, Monday → Sunday. Tap a day to see what was done.
+      const today = dayKey(daysAgo(0)), mon = startOfWeek();
       let html = '';
-      for (let i = 13; i >= 0; i--) {
-        const k = dayKey(daysAgo(i));
-        const cls = (liftDays.has(k) ? ' lift' : '') + (cardioDays.has(k) ? ' cardio' : '') + (i === 0 ? ' today' : '');
-        html += '<div class="tr-day' + cls + '" title="' + k + '"></div>';
+      for (let i = -7; i < 7; i++) {
+        if (i === -7) html += '<div class="tr-wk-label">Last week</div>';
+        if (i === 0) html += '<div class="tr-wk-label">This week</div>';
+        const d = new Date(mon); d.setDate(d.getDate() + i);
+        const k = dayKey(d), future = k > today;
+        const cls = (liftDays.has(k) ? ' lift' : '') + (cardioDays.has(k) ? ' cardio' : '') + (k === today ? ' today' : '')
+          + (future ? ' future' : '') + (k === selDay ? ' sel' : '');
+        html += '<button type="button" class="tr-day' + cls + '" data-k="' + k + '"' + (future ? ' disabled' : '')
+          + ' aria-label="' + d.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' }) + '">' + d.getDate() + '</button>';
       }
       $('trStrip').innerHTML = html;
+      const selDow = (new Date(selDay + 'T12:00').getDay() + 6) % 7;
+      $('trDow').innerHTML = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((n, i) => '<span' + (i === selDow ? ' class="on"' : '') + '>' + n + '</span>').join('');
+      $('trStrip').querySelectorAll('.tr-day:not(.future)').forEach((b) => b.onclick = () => { selDay = b.dataset.k; renderOverview(); });
+      renderDay();
+    }
+
+    // ---------- Selected day ----------
+    let selDay = dayKey(daysAgo(0));
+    const CARDIO_ICONS = { Run: '🏃', TrailRun: '🏃', VirtualRun: '🏃', Walk: '🚶', Hike: '🥾', Ride: '🚴', VirtualRide: '🚴', Swim: '🏊', Yoga: '🧘', Rowing: '🚣', Elliptical: '🌀', StairStepper: '🪜', HighIntensityIntervalTraining: '🔥' };
+    function renderDay() {
+      const d = new Date(selDay + 'T12:00');
+      const label = selDay === dayKey(daysAgo(0)) ? 'Today' : selDay === dayKey(daysAgo(1)) ? 'Yesterday'
+        : d.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+      const lifts = workouts.filter((w) => dayKey(w.workout_perform_date) === selDay);
+      const cardio = stravaActs().filter((a) => !isLift(a) && a.start_date_local.slice(0, 10) === selDay);
+      const u = unit();
+      let html = '<div class="tr-dayview-h">' + esc(label) + '</div>';
+      lifts.forEach((w) => {
+        const a = stravaFor(w);
+        const exs = (w.exercises || []).filter((ex) => doneSets(ex).length);
+        html += '<div class="tr-dv-item"><div class="tr-dv-ico lift">🏋️</div><div style="flex:1;min-width:0">'
+          + '<div class="tr-dv-name">' + esc(w.title || 'Workout') + '</div>'
+          + '<div class="tr-dv-meta">' + [a ? fmtDur(a.moving_time || a.elapsed_time) : '', wSets(w) + ' sets', fmtVol(wVolume(w)) + ' ' + u].filter(Boolean).join(' · ') + '</div>'
+          + '<div class="tr-dv-ex">' + exs.map((ex) => '<b>' + esc(ex.excercise_name) + '</b> — ' + doneSets(ex).map((st) =>
+              num(st.weight) ? fmtW(num(st.weight)) + '×' + num(st.reps) : num(st.reps) ? num(st.reps) + ' reps' : num(st.duration) + 's').join(', ')).join('<br>') + '</div>'
+          + '<button type="button" class="tr-dv-open" data-i="' + workouts.indexOf(w) + '">Open full workout ↓</button></div></div>';
+      });
+      cardio.forEach((a) => {
+        const bits = [fmtDur(a.moving_time || a.elapsed_time || 0)];
+        if (a.distance > 50) bits.push((a.distance / 1609.344).toFixed(2) + ' mi');
+        if (a.distance > 50 && a.moving_time && /Run|Walk|Hike/.test(a.sport_type || a.type)) {
+          const pace = a.moving_time / (a.distance / 1609.344);
+          bits.push(Math.floor(pace / 60) + ':' + String(Math.round(pace % 60)).padStart(2, '0') + ' /mi');
+        }
+        if (a.average_heartrate) bits.push(Math.round(a.average_heartrate) + ' bpm');
+        if (a.calories || a.kilojoules) bits.push(Math.round(a.calories || a.kilojoules / 4.184) + ' kcal');
+        html += '<div class="tr-dv-item"><div class="tr-dv-ico cardio">' + (CARDIO_ICONS[a.sport_type] || CARDIO_ICONS[a.type] || '⚡') + '</div><div style="flex:1;min-width:0">'
+          + '<div class="tr-dv-name">' + esc(a.name || 'Cardio') + '</div><div class="tr-dv-meta">' + esc(bits.join(' · ')) + '</div></div></div>';
+      });
+      if (!lifts.length && !cardio.length) html += '<div class="tr-dv-empty">Rest day — nothing logged.</div>';
+      $('trDayView').innerHTML = html;
+      $('trDayView').querySelectorAll('.tr-dv-open').forEach((b) => b.onclick = () => {
+        renderWorkout(workouts[Number(b.dataset.i)]);
+        $('trLastTitle').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
     }
 
     // ---------- Muscle map ----------
