@@ -640,6 +640,9 @@ main {
     .fu-in { width: 100%; padding: 12px 13px; border-radius: 12px; border: 1px solid var(--line-2); background: rgba(0,0,0,0.3); color: var(--ink); font-family: inherit; font-size: 14.5px; outline: none; box-sizing: border-box; }
     .fu-in:focus { border-color: rgba(134,239,192,0.5); }
     textarea.fu-in { resize: vertical; min-height: 70px; }
+    .fu-fix { margin: 4px 0 12px; font-size: 13px; color: var(--mute); }
+    .fu-fix summary { cursor: pointer; padding: 6px 0; }
+    .fu-fix .fu-btn { margin-top: 0; }
     .fu-hint { font-size: 12px; color: var(--mute); margin: 8px 0; line-height: 1.5; }
     .fu-btn { width: 100%; margin-top: 10px; padding: 15px; border-radius: 14px; border: 0; background: linear-gradient(180deg, #A3F5CF, #6FDDA9); color: #052417; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
     .fu-btn.ghost { background: rgba(255,255,255,0.04); border: 1px solid var(--line-2); color: var(--ink); }
@@ -969,8 +972,13 @@ main {
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && sheetBg.classList.contains('open')) closeSheet(); });
 
     function apiKey() { try { return localStorage.getItem(NOVA_KEY) || ''; } catch { return ''; } }
+    // When ANTHROPIC_API_KEY is set in Vercel, /api/meal calls Claude and no
+    // key is needed on this device. Otherwise fall back to a pasted key.
+    let serverAI = false;
+    fetch('/api/meal').then((r) => r.ok ? r.json() : {}).then((j) => { serverAI = !!j.configured; }).catch(() => {});
+    function canAI() { return serverAI || !!apiKey(); }
     function keyField() {
-      return apiKey() ? '' : '<div class="fu-hint">Photo and text estimates use your Anthropic API key (the same one Nova uses). Paste it once:</div>'
+      return canAI() ? '' : '<div class="fu-hint">Photo and text estimates use your Anthropic API key (the same one Nova uses). Paste it once:</div>'
         + '<input class="fu-in" id="fuKeyIn" type="password" placeholder="sk-ant-…" autocomplete="off" style="margin-bottom:10px">';
     }
     function takeKey() {
@@ -1010,6 +1018,8 @@ main {
       let img;
       try { img = await loadImage(file); } catch (e) { openSheet('Snap a meal', '<div class="fu-err">' + esc(e.message) + '</div>'); return; }
       const photo = toJpeg(img, 1280, 0.82), thumb = squareThumb(img);
+      // Ready to go → analyze straight away; details can be added on the review screen.
+      if (canAI()) { openSheet('Snap a meal', ''); analyze({ photo, thumb, note: '' }); return; }
       openSheet('Snap a meal', '<img class="fu-photo" src="' + photo + '" alt="Meal photo">' + keyField()
         + '<textarea class="fu-in" id="fuNote" placeholder="Optional: anything the photo can\'t show — cooked in butter, 2 tortillas, 8 oz chicken"></textarea>'
         + '<button class="fu-btn" id="fuGo" type="button">Analyze meal</button>');
@@ -1059,7 +1069,7 @@ main {
         if ('BarcodeDetector' in window) {
           try { const found = await new window.BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e'] }).detect(img); code = found[0] ? found[0].rawValue : ''; } catch {}
         }
-        if (!code && apiKey()) {
+        if (!code && canAI()) {
           const r = await callClaude([{ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: toJpeg(img, 1280, 0.9).split(',')[1] } },
             { type: 'text', text: 'Read the product barcode number (UPC/EAN digits) in this photo. Return only digits; empty string if unreadable.' }],
             'You read barcodes from photos.', { type: 'object', additionalProperties: false, required: ['barcode'], properties: { barcode: { type: 'string' } } }, 'low');
@@ -1121,8 +1131,11 @@ main {
     };
     async function callClaude(content, system, schema, effort) {
       const key = apiKey();
-      if (!key) throw new Error('Add your Anthropic API key first.');
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
+      if (!serverAI && !key) throw new Error('Add your Anthropic API key first.');
+      const res = serverAI ? await fetch('/api/meal', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ system, content, schema, effort }),
+      }) : await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
           'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01',
@@ -1138,7 +1151,8 @@ main {
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) {
-        if (res.status === 401) throw new Error('That API key was rejected. Check it on the Nova page.');
+        if (res.status === 401) throw new Error(serverAI ? 'The API key in Vercel was rejected. Check ANTHROPIC_API_KEY.' : 'That API key was rejected. Check it on the Nova page.');
+        if (res.status === 413) throw new Error('That photo is too large — try again with a smaller one.');
         throw new Error((j.error && j.error.message) || ('Request failed (' + res.status + ')'));
       }
       if (j.stop_reason === 'refusal') throw new Error('Claude declined to analyze this one. Try describing the meal instead.');
@@ -1147,7 +1161,7 @@ main {
       try { return JSON.parse(text); } catch { throw new Error('Could not read the estimate — try again.'); }
     }
     async function analyze({ photo, thumb, note }) {
-      if (!takeKey()) { const el = $('fuKeyIn'); if (el) el.focus(); return; }
+      if (!serverAI && !takeKey()) { const el = $('fuKeyIn'); if (el) el.focus(); return; }
       sheetBody.innerHTML = (photo ? '<img class="fu-photo" src="' + photo + '" alt="">' : '')
         + '<div class="fu-loading"><div class="fu-spin"></div>Reading your meal… 10–30 seconds</div>';
       try {
@@ -1177,6 +1191,9 @@ main {
         + '<button type="button" class="fu-star' + (isFav() ? ' on' : '') + '" id="fuStar">' + (isFav() ? '★ Favorite' : '☆ Favorite') + '</button></div>'
         + '<div class="fu-tot" id="fuTot"></div>'
         + (meal.notes || meal.confidence ? '<div class="fu-conf">' + (meal.confidence ? '<b>' + esc(meal.confidence[0].toUpperCase() + meal.confidence.slice(1)) + ' confidence.</b> ' : '') + esc(meal.notes || '') + '</div>' : '')
+        + (isNew && photo ? '<details class="fu-fix"><summary>Something off? Add details</summary>'
+          + '<textarea class="fu-in" id="fuFixNote" placeholder="e.g. cooked in butter, 2 tortillas, 8 oz chicken">' + esc(meal.note || '') + '</textarea>'
+          + '<button class="fu-btn ghost" id="fuFixGo" type="button">Re-analyze with details</button></details>' : '')
         + '<div id="fuItems"></div>'
         + '<button class="fu-btn ghost" id="fuAddItem" type="button">+ Add item</button>'
         + '<div class="fu-row2">' + (isNew ? '<button class="fu-btn ghost" id="fuCancel" type="button">Cancel</button>' : '<button class="fu-btn danger" id="fuDelete" type="button">Delete</button>')
@@ -1232,6 +1249,7 @@ main {
         $('fuStar').classList.toggle('on', favWanted);
         $('fuStar').textContent = favWanted ? '★ Favorite' : '☆ Favorite';
       });
+      if ($('fuFixGo')) $('fuFixGo').addEventListener('click', () => analyze({ photo, thumb: th, note: $('fuFixNote').value.trim() }));
       $('fuAddItem').addEventListener('click', () => { items.push(Object.assign(blankItem(), { _base: { g: 0, kcal: 0, p: 0, c: 0, f: 0, fib: 0 } })); drawItems(); drawTot(); });
       const clean = () => items.filter((i) => String(i.name).trim() || i.kcal).map((i) => { const o = Object.assign({}, i); delete o._base; return o; });
       function syncFav(name) {
