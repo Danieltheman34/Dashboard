@@ -899,6 +899,8 @@ img, video, canvas, svg { max-width: 100%; }
   font-size: 13px; font-weight: 500; margin-bottom: 14px;
   font-variant-numeric: tabular-nums;
 }
+.wt-start { font-size: 13px; color: var(--text-2); margin: -6px 0 14px; font-variant-numeric: tabular-nums; }
+.wt-start b { color: var(--text-1); font-weight: 600; }
 .wt-delta.up   { color: var(--warn); }
 .wt-delta.down { color: var(--good); }
 .wt-streak {
@@ -2030,6 +2032,7 @@ img, video, canvas, svg { max-width: 100%; }
         <span class="wt-unit" id="wtUnit">lb</span>
       </div>
       <div class="wt-delta hidden" id="wtDelta"></div>
+      <div class="wt-start hidden" id="wtStart"></div>
       <div class="wt-streak hidden" id="wtStreak">🔥<span id="wtStreakNum">0 day streak</span></div>
 
       <div class="wt-empty" id="wtEmpty">Log your first weight to start tracking.</div>
@@ -3533,7 +3536,7 @@ img, video, canvas, svg { max-width: 100%; }
   // Switching kg <-> lb converts every stored weight, not just the label.
   // Lyfta-imported sets are dropped and re-imported from Lyfta in the new
   // unit (exact values instead of a double-rounded conversion).
-  function convertUnits(to) {
+  function convertUnits(to, keepBody) {
     const f = to === 'lb' ? 1 / 0.45359237 : 0.45359237;
     const conv = (w, stepTo) => Math.round(w * f / stepTo) * stepTo;
     const STEPS = to === 'lb' ? { 1.25: 2.5, 2.5: 5, 5: 10, 10: 20 } : { 2.5: 1.25, 5: 2.5, 10: 5, 20: 10 };
@@ -3546,8 +3549,10 @@ img, video, canvas, svg { max-width: 100%; }
         .map(l => Object.assign({}, l, { weight: l.weight ? conv(l.weight, to === 'lb' ? 0.5 : 0.25) : 0 }));
     });
     delete state.lyftaImportVer;
-    wtEntries = wtEntries.map(e => Object.assign({}, e, { weight: Math.round(e.weight * f * 10) / 10 }));
-    wtSave(wtEntries);
+    if (!keepBody) {
+      wtEntries = wtEntries.map(e => Object.assign({}, e, { weight: Math.round(e.weight * f * 10) / 10 }));
+      wtSave(wtEntries);
+    }
     state.units = to;
     saveState();
     renderAll();
@@ -3654,8 +3659,8 @@ img, video, canvas, svg { max-width: 100%; }
   function wtSaveEntry(weight) {
     const key = wtDateKey(new Date());
     const existing = wtEntries.find(e => e.dateKey === key);
-    if (existing) existing.weight = weight;
-    else { wtEntries.push({ dateKey: key, weight }); wtEntries.sort((a,b) => a.dateKey.localeCompare(b.dateKey)); }
+    if (existing) { existing.weight = weight; existing.t = Date.now(); }
+    else { wtEntries.push({ dateKey: key, weight, t: Date.now() }); wtEntries.sort((a,b) => a.dateKey.localeCompare(b.dateKey)); }
     wtSave(wtEntries);
     wtRender();
   }
@@ -3670,6 +3675,18 @@ img, video, canvas, svg { max-width: 100%; }
     $('wtUnit').textContent = u;
     $('wtUnitStatic').textContent = u;
     $('wtNum').textContent = last ? last.weight.toFixed(1) : '—';
+
+    // Starting weight = first entry ever logged.
+    const first = wtEntries[0];
+    if (first) {
+      const since = last.weight - first.weight;
+      const when = wtParseKey(first.dateKey).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      $('wtStart').innerHTML = 'Started at <b>' + first.weight.toFixed(1) + ' ' + u + '</b> · ' + when
+        + (wtEntries.length > 1 && Math.abs(since) >= 0.05 ? ' · ' + (since > 0 ? '+' : '−') + Math.abs(since).toFixed(1) + ' ' + u + ' since' : '');
+      $('wtStart').classList.remove('hidden');
+    } else {
+      $('wtStart').classList.add('hidden');
+    }
 
     // Locked vs input
     if (todayEntry) {
@@ -4285,8 +4302,9 @@ img, video, canvas, svg { max-width: 100%; }
   // ============================================================
   // BOOT
   // ============================================================
-  // Everything is shown in lb. Older saves in kg are converted once.
-  function ensureLb() { if (state.units !== 'lb') convertUnits('lb'); }
+  // Everything is shown in lb. Older saves in kg get their lift weights
+  // converted once; body weights were already typed in lb, so they stay.
+  function ensureLb() { if (state.units !== 'lb') convertUnits('lb', true); }
   ensureLb();
   renderAll();
   wtRender();
@@ -4394,7 +4412,7 @@ img, video, canvas, svg { max-width: 100%; }
   function pcApplyRemoteState(remote) {
     if (!remote || typeof remote !== 'object') return false;
     pcSuppressSync = true;
-    let changed = false;
+    let changed = false, needPush = false;
     try {
       for (const k of PC_SYNCED_KEYS) {
         if (k === 'po_coach_photos') {
@@ -4412,6 +4430,22 @@ img, video, canvas, svg { max-width: 100%; }
           }
           continue;
         }
+        if (k === WT_KEY) {
+          // Merge by day: keep every day from both sides, newest save wins.
+          let localW = [];
+          try { localW = JSON.parse(localStorage.getItem(k) || '[]'); } catch {}
+          const byDay = {};
+          (Array.isArray(remote[k]) ? remote[k] : []).concat(localW).forEach((e) => {
+            if (!e || !e.dateKey) return;
+            const cur = byDay[e.dateKey];
+            if (!cur || (e.t || 0) > (cur.t || 0)) byDay[e.dateKey] = e;
+          });
+          const merged = Object.values(byDay).sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+          const incoming = JSON.stringify(merged);
+          if (localStorage.getItem(k) !== incoming) { try { _pcOrigSet(k, incoming); changed = true; } catch {} }
+          if (incoming !== JSON.stringify(remote[k] || [])) needPush = true;
+          continue;
+        }
         if (k in remote) {
           const incoming = JSON.stringify(remote[k]);
           const local = localStorage.getItem(k);
@@ -4424,6 +4458,8 @@ img, video, canvas, svg { max-width: 100%; }
       pcSuppressSync = false;
     }
     if (changed) { try { pcRerender(); } catch (e) {} }
+    // Local weights the cloud didn't have yet → send them up.
+    if (needPush) pcSchedulePush();
     return changed;
   }
 
