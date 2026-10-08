@@ -256,7 +256,7 @@ body::after {
       <div class="dx-eyebrow" id="hubDate">Today</div>
       <h1 class="dash-title" id="hubGreeting">Daniel's <em>Dashboard</em></h1>
     </div>
-    <button class="gear-btn" id="settingsOpen" type="button" aria-label="Settings">
+    <button class="gear-btn" id="settingsOpen" type="button" aria-label="Settings" hidden style="display:none">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="3"/>
         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
@@ -300,7 +300,6 @@ body::after {
   </section>
 
   <div class="bento">
-
     <!-- Big tile -->
     <a class="tile big" href="main.html" style="--accent:#6BE3A4">
       <div class="tile-top">
@@ -358,37 +357,9 @@ body::after {
     </a>
 
     <!-- Small tile -->
-    <a class="tile" href="sleep.html" style="--accent:#D9B98A">
-      <div class="tile-top">
-        <span class="tile-num">·08</span>
-        <span class="tile-emoji">🌙</span>
-      </div>
-      <div class="tile-spacer"></div>
-      <h2 class="tile-title">Sleep</h2>
-      <div class="tile-foot">
-        <span class="tile-sub">Apple Watch nights</span>
-        <span class="tile-arrow">→</span>
-      </div>
-    </a>
-
-    <!-- Wide tile -->
-    <a class="tile wide" href="finance.html" style="--accent:#F2C063">
-      <div class="tile-top">
-        <span class="tile-num">·05</span>
-        <span class="tile-emoji">📊</span>
-      </div>
-      <div class="tile-spacer"></div>
-      <h2 class="tile-title">Finance</h2>
-      <div class="tile-foot">
-        <span class="tile-sub">Net worth & spending</span>
-        <span class="tile-arrow">→</span>
-      </div>
-    </a>
-
-    <!-- Small tile -->
     <a class="tile" href="caffeine.html" style="--accent:#C9A36B">
       <div class="tile-top">
-        <span class="tile-num">·06</span>
+        <span class="tile-num">·05</span>
         <span class="tile-emoji">☕</span>
       </div>
       <div class="tile-spacer"></div>
@@ -400,9 +371,37 @@ body::after {
     </a>
 
     <!-- Wide tile -->
-    <a class="tile wide" href="nova-lite.html" style="--accent:#A78BFA">
+    <a class="tile wide" href="finance.html" style="--accent:#F2C063">
+      <div class="tile-top">
+        <span class="tile-num">·06</span>
+        <span class="tile-emoji">📊</span>
+      </div>
+      <div class="tile-spacer"></div>
+      <h2 class="tile-title">Finance</h2>
+      <div class="tile-foot">
+        <span class="tile-sub">Net worth & spending</span>
+        <span class="tile-arrow">→</span>
+      </div>
+    </a>
+
+    <!-- Small tile -->
+    <a class="tile" href="sleep.html" style="--accent:#D9B98A">
       <div class="tile-top">
         <span class="tile-num">·07</span>
+        <span class="tile-emoji">🌙</span>
+      </div>
+      <div class="tile-spacer"></div>
+      <h2 class="tile-title">Sleep</h2>
+      <div class="tile-foot">
+        <span class="tile-sub">Apple Watch nights</span>
+        <span class="tile-arrow">→</span>
+      </div>
+    </a>
+
+    <!-- Wide tile -->
+    <a class="tile wide" href="nova-lite.html" style="--accent:#A78BFA">
+      <div class="tile-top">
+        <span class="tile-num">·08</span>
         <span class="tile-emoji">🧠</span>
       </div>
       <div class="tile-spacer"></div>
@@ -412,6 +411,7 @@ body::after {
         <span class="tile-arrow">→</span>
       </div>
     </a>
+
 
   </div>
 </div>
