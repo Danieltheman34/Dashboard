@@ -7,6 +7,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#050506">
 <title>Daniel's Dashboard</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Dashboard">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<script src="/polish.js"></script>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="sync.js" defer></script>
@@ -137,6 +145,40 @@ body::after {
   .tile.big, .tile.wide { grid-column: span 1; }
 }
 
+/* ===== Header: date eyebrow + serif title ===== */
+.hub-head { align-items: flex-end !important; }
+.hub-head .dash-title { font-family: var(--dx-serif, Georgia, serif); font-weight: 400; font-size: 44px; line-height: 1; letter-spacing: -0.01em;
+  background: none; -webkit-text-fill-color: #EFE9DF; color: #EFE9DF; margin-top: 6px !important; }
+.hub-head .dash-title em { font-style: italic; -webkit-text-fill-color: rgba(239,233,223,0.55); }
+@media (max-width: 480px) { .hub-head .dash-title { font-size: 38px; } }
+.tile-title { font-family: var(--dx-serif, Georgia, serif); font-weight: 400 !important; font-size: 28px !important; letter-spacing: -0.005em !important; }
+.tile.big .tile-title { font-size: 36px !important; }
+.tile-num { font-family: var(--dx-serif, Georgia, serif) !important; font-style: italic; font-size: 16px !important; font-weight: 400 !important; letter-spacing: 0 !important; }
+
+/* ===== Today at a glance ===== */
+.dx-today { position: relative; overflow: hidden; margin: 0 0 22px; padding: 20px; border-radius: 22px;
+  background: linear-gradient(160deg, rgba(255,255,255,0.055), rgba(255,255,255,0.02));
+  border: 1px solid rgba(255,255,255,0.07); box-shadow: 0 18px 50px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.05); }
+.dx-today::before { content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(circle at 92% 0%, rgba(224,118,88,0.16), transparent 50%); }
+.td-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 16px; position: relative; }
+.td-head .dx-eyebrow b { color: #EFE9DF; font-weight: 600; }
+.td-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; position: relative; }
+.td-cell { display: block; text-decoration: none; color: inherit; padding: 14px; border-radius: 16px; background: rgba(0,0,0,0.22); border: 1px solid rgba(255,255,255,0.05);
+  transition: border-color .18s, transform .18s; -webkit-tap-highlight-color: transparent; min-width: 0; }
+.td-cell:active { transform: scale(0.98); }
+.td-cell:hover { border-color: rgba(255,255,255,0.14); }
+.td-cell.wide { grid-column: span 2; }
+.td-lbl { display: flex; align-items: center; gap: 7px; font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-tertiary); }
+.td-lbl i { width: 6px; height: 6px; border-radius: 50%; background: var(--c); box-shadow: 0 0 8px var(--c); }
+.td-val { font-family: var(--dx-serif, Georgia, serif); font-size: 34px; line-height: 1; color: #EFE9DF; margin-top: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.td-cell.wide .td-val { font-size: 46px; }
+.td-val small { font-family: var(--font); font-size: 12px; color: var(--text-tertiary); margin-left: 4px; letter-spacing: 0; }
+.td-sub { font-size: 12px; color: var(--text-tertiary); margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.td-sub b { color: var(--text-secondary); font-weight: 600; }
+.dx-bar { display: block; height: 4px; border-radius: 999px; background: rgba(255,255,255,0.07); margin-top: 12px; overflow: hidden; }
+.dx-bar i { display: block; height: 100%; border-radius: 999px; background: var(--c); box-shadow: 0 0 12px var(--c); transition: width .8s cubic-bezier(0.22,1,0.36,1); }
+
 /* ===== Header row + gear ===== */
 .hub-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
 .hub-head .dash-title { margin: 0; }
@@ -210,7 +252,10 @@ body::after {
 <div class="page">
 
   <div class="hub-head">
-    <h1 class="dash-title">Daniel's Dashboard</h1>
+    <div>
+      <div class="dx-eyebrow" id="hubDate">Today</div>
+      <h1 class="dash-title" id="hubGreeting">Daniel's <em>Dashboard</em></h1>
+    </div>
     <button class="gear-btn" id="settingsOpen" type="button" aria-label="Settings">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="3"/>
@@ -218,6 +263,41 @@ body::after {
       </svg>
     </button>
   </div>
+
+  <!-- Today at a glance — calories, water, sleep, lift, weight. Each links to its page. -->
+  <section class="dx-today" aria-label="Today at a glance">
+    <div class="td-head"><span class="dx-eyebrow"><b>Today</b> at a glance</span><span class="dx-eyebrow" id="tdUpdated"></span></div>
+    <div class="td-grid">
+      <a class="td-cell wide" href="health.html" style="--c:#86EFC0">
+        <div class="td-lbl"><i></i>Calories</div>
+        <div class="td-val" id="tdKcal">—<small>kcal left</small></div>
+        <div class="td-sub" id="tdKcalSub">—</div>
+        <span class="dx-bar"><i id="tdKcalBar" style="width:0%"></i></span>
+      </a>
+      <a class="td-cell" href="po-water.html" style="--c:#8EC5E8">
+        <div class="td-lbl"><i></i>Water</div>
+        <div class="td-val" id="tdWater">—<small>oz</small></div>
+        <div class="td-sub" id="tdWaterSub">—</div>
+        <span class="dx-bar"><i id="tdWaterBar" style="width:0%"></i></span>
+      </a>
+      <a class="td-cell" href="sleep.html" style="--c:#D9B98A">
+        <div class="td-lbl"><i></i>Sleep</div>
+        <div class="td-val" id="tdSleep">—</div>
+        <div class="td-sub" id="tdSleepSub">—</div>
+        <span class="dx-bar"><i id="tdSleepBar" style="width:0%"></i></span>
+      </a>
+      <a class="td-cell" href="gym.html" style="--c:#FF8A5B">
+        <div class="td-lbl"><i></i>Lift</div>
+        <div class="td-val" id="tdLift">—</div>
+        <div class="td-sub" id="tdLiftSub">—</div>
+      </a>
+      <a class="td-cell" href="gym.html" style="--c:#C4B5FD">
+        <div class="td-lbl"><i></i>Weight</div>
+        <div class="td-val" id="tdWeight">—</div>
+        <div class="td-sub" id="tdWeightSub">—</div>
+      </a>
+    </div>
+  </section>
 
   <div class="bento">
 
@@ -601,6 +681,115 @@ body::after {
     $('whAction').textContent = 'Syncing…'; syncWhoop();
   });
 })();
+
+</script>
+<script>
+  /* ---------- Today at a glance ---------- */
+  (function today() {
+    const $ = (id) => document.getElementById(id);
+    const HOUR = 3600e3;
+    const dk = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    const now = new Date(), TODAY = dk(now);
+    const ls = (k, f) => { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? f : v; } catch (e) { return f; } };
+    const fmt = (n) => Math.round(n).toLocaleString();
+    const pct = (a, b) => Math.max(0, Math.min(100, b > 0 ? 100 * a / b : 0)) + '%';
+    const hr = now.getHours();
+    $('hubDate').textContent = now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+    $('hubGreeting').innerHTML = (hr < 5 ? 'Good night' : hr < 12 ? 'Good morning' : hr < 18 ? 'Good afternoon' : 'Good evening') + ', <em>Daniel</em>';
+
+    let remote = {};   // app_state rows by key
+    let lyfta = (ls('lyfta_cache_v1', {}) || {}).workouts || [];
+    const doneSets = (ex) => (ex.sets || []).filter((s) => parseFloat(s.reps) > 0 || parseFloat(s.duration) > 0);
+    const todaysLifts = () => lyfta.filter((w) => dk(new Date(w.workout_perform_date)) === TODAY);
+    const pick = (row, k, f) => (remote[row] && remote[row][k] !== undefined ? remote[row][k] : ls(k, f));
+
+    function nightTotal(samples) {
+      // Asleep time for the sleep session that ended today (Apple Watch samples).
+      const rows = (samples || []).map((s) => [Date.parse(s[0]), Date.parse(s[1]), s[2]]).filter((r) => r[1] > r[0]).sort((a, b) => a[0] - b[0]);
+      const sessions = [];
+      for (const r of rows) { const c = sessions[sessions.length - 1]; if (c && r[0] <= c.end + 2 * HOUR) { c.rows.push(r); c.end = Math.max(c.end, r[1]); } else sessions.push({ end: r[1], rows: [r] }); }
+      let best = 0;
+      for (const s of sessions) {
+        const total = (stages) => { const iv = s.rows.filter((r) => stages.includes(r[2])).sort((a, b) => a[0] - b[0]); let t = 0, e = -Infinity; for (const r of iv) { const a = Math.max(r[0], e); if (r[1] > a) t += r[1] - a; e = Math.max(e, r[1]); } return t; };
+        const t = total(['asleep', 'core', 'deep', 'rem']) || total(['inbed']);
+        if (t >= 2 * HOUR && dk(new Date(s.end)) === TODAY) best = Math.max(best, t);
+      }
+      return best;
+    }
+
+    function render() {
+      // Calories
+      const meals = pick('meals', 'meals:day:' + TODAY, []) || [];
+      const eaten = meals.flatMap((m) => m.items || []).reduce((t, i) => t + (+i.kcal || 0), 0);
+      const raw = pick('meals', 'meals:goals', {}) || {};
+      const gym = Object.assign({ kcal: 2500, p: 190 }, raw.gym || (raw.kcal ? raw : {}));
+      const type = pick('meals', 'meals:type:' + TODAY, null) || (todaysLifts().length ? 'gym' : 'rest');
+      const goal = (type === 'rest' ? Object.assign({}, gym, raw.rest || {}) : gym);
+      const protein = meals.flatMap((m) => m.items || []).reduce((t, i) => t + (+i.p || 0), 0);
+      const left = goal.kcal - eaten;
+      $('tdKcal').innerHTML = fmt(Math.abs(left)) + '<small>' + (left >= 0 ? 'kcal left' : 'kcal over') + '</small>';
+      $('tdKcalSub').innerHTML = '<b>' + fmt(eaten) + '</b> eaten of ' + fmt(goal.kcal) + ' · <b>' + fmt(protein) + '</b> / ' + fmt(goal.p) + ' g protein';
+      $('tdKcalBar').style.width = pct(eaten, goal.kcal);
+
+      // Water (oz). The top bar knows the goal and today's count on this device.
+      const wp = window.dashWaterProgress ? window.dashWaterProgress() : { done: 0, total: 110 };
+      const rw = remote.health && remote.health.po_water_v1;
+      const done = Math.max(wp.done || 0, (rw && rw.unit === 'oz' && rw.logs && rw.logs[TODAY]) || 0);
+      $('tdWater').innerHTML = fmt(done) + '<small>/ ' + fmt(wp.total) + ' oz</small>';
+      $('tdWaterSub').textContent = done >= wp.total ? 'Goal reached' : fmt(wp.total - done) + ' oz to go';
+      $('tdWaterBar').style.width = pct(done, wp.total);
+
+      // Sleep — Apple Watch night that ended today, else a manually logged one.
+      const goalH = +pick('sleep', 'sleep:goal', 8) || 8;
+      let ms = nightTotal(remote.sleep_data ? remote.sleep_data.samples : (ls('sleep:cache', {}) || {}).samples);
+      const man = (pick('sleep', 'sleep:manual', {}) || {})[TODAY];
+      if (!ms && man && man.bed && man.wake) {
+        const [bh, bm] = man.bed.split(':').map(Number), [wh, wm] = man.wake.split(':').map(Number);
+        ms = ((wh * 60 + wm) - (bh * 60 + bm) + 1440) % 1440 * 60e3;
+      }
+      if (ms) {
+        const m = Math.round(ms / 60e3);
+        $('tdSleep').innerHTML = Math.floor(m / 60) + '<small>h</small> ' + String(m % 60).padStart(2, '0') + '<small>m</small>';
+        $('tdSleepSub').textContent = ms >= goalH * HOUR ? 'Hit your ' + goalH + 'h goal' : 'Goal ' + goalH + 'h';
+      } else { $('tdSleep').innerHTML = '—'; $('tdSleepSub').textContent = 'No night synced yet'; }
+      $('tdSleepBar').style.width = pct(ms, goalH * HOUR);
+
+      // Lift — today's Lyfta workout(s).
+      const lifts = todaysLifts();
+      if (lifts.length) {
+        const sets = lifts.reduce((t, w) => t + (w.exercises || []).reduce((a, ex) => a + doneSets(ex).length, 0), 0);
+        $('tdLift').innerHTML = sets + '<small>sets</small>';
+        $('tdLiftSub').textContent = lifts.map((w) => (w.title || 'Workout').replace(/^\d+\/\d+\s*/, '')).join(' + ');
+      } else { $('tdLift').innerHTML = 'Rest'; $('tdLiftSub').textContent = 'No workout logged yet'; }
+
+      // Weight — latest entry vs where you started.
+      const wts = (pick('po-coach', 'po_coach_weights', []) || []).slice().sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+      if (wts.length) {
+        const first = wts[0], last = wts[wts.length - 1], diff = last.weight - first.weight;
+        $('tdWeight').innerHTML = (+last.weight).toFixed(1) + '<small>lb</small>';
+        $('tdWeightSub').textContent = wts.length > 1 && Math.abs(diff) >= 0.05 ? (diff < 0 ? '−' : '+') + Math.abs(diff).toFixed(1) + ' lb since ' + first.weight : 'Started at ' + first.weight + ' lb';
+      } else { $('tdWeight').innerHTML = '—'; $('tdWeightSub').textContent = 'Log it on Fitness'; }
+    }
+
+    render();
+    // Fresh numbers from the cloud (other devices) + today's Lyfta workout.
+    const URL_ = window.DASH_SUPABASE_URL, KEY = window.DASH_SUPABASE_KEY;
+    const jobs = [];
+    if (URL_ && KEY && String(URL_).indexOf('PASTE-') !== 0) {
+      jobs.push(fetch(URL_ + '/rest/v1/app_state?select=key,data&key=in.(meals,health,sleep,sleep_data,po-coach)', { headers: { apikey: KEY, Authorization: 'Bearer ' + KEY } })
+        .then((r) => r.ok ? r.json() : []).then((rows) => { rows.forEach((r) => { remote[r.key] = r.data || {}; }); }).catch(() => {}));
+    }
+    jobs.push(fetch('/api/lyfta?path=/workouts&limit=10&page=1&from=' + TODAY, { cache: 'no-store' })
+      .then((r) => r.ok ? r.json() : null).then((j) => { if (j && Array.isArray(j.workouts)) { const ids = new Set(lyfta.map((w) => w.id)); lyfta = j.workouts.filter((w) => !ids.has(w.id)).concat(lyfta); } }).catch(() => {}));
+    Promise.all(jobs).then(() => {
+      const ids = ['tdKcal', 'tdWater', 'tdSleep', 'tdLift', 'tdWeight'], before = ids.map((id) => $(id).innerHTML);
+      render();
+      ids.forEach((id, i) => { if ($(id).innerHTML !== before[i] && window.dxCountUp) window.dxCountUp($(id)); });
+      $('tdUpdated').textContent = new Date().toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    });
+    window.addEventListener('water:changed', render);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) render(); });
+  })();
 </script>
 </body>
 </html>

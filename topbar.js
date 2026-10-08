@@ -507,6 +507,8 @@ body.topbar-modal-open {
     sync();
   }
 
+  window.dashWaterProgress = getWaterProgress;
+
   // -------- Boot --------
   function boot() {
     injectStyleAndHTML();
