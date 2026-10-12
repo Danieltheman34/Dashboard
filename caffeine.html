@@ -123,6 +123,18 @@ body::after {
 .mini .v { font-size: 20px; font-weight: 700; color: var(--text-primary); margin-top: 7px; font-variant-numeric: tabular-nums; line-height: 1.1; }
 .mini .s { font-size: 11.5px; color: var(--text-tertiary); margin-top: 5px; line-height: 1.4; }
 .mini.peak .v { color: var(--success); } .mini.crash .v { color: var(--warning); } .mini.cutoff .v { color: #7DD3FC; }
+.basis { margin-top: 12px; font-size: 12.5px; line-height: 1.5; color: var(--text-tertiary); }
+.basis b { color: var(--text-secondary); font-weight: 600; }
+.ci { margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.06); }
+.ci-q { font-size: 13px; color: var(--text-primary); font-weight: 600; margin-bottom: 10px; }
+.ci-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.ci-row button { min-height: 52px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.10); background: rgba(255,255,255,0.03); color: var(--text-primary); font: 600 16px var(--font); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+.ci-row button small { font-size: 10.5px; font-weight: 500; color: var(--text-tertiary); }
+.ci-row button:active { transform: scale(0.96); background: rgba(242,192,99,0.15); }
+.ci-msg { font-size: 12px; color: #F2C063; margin-top: 8px; min-height: 0; }
+.ci-msg:empty { display: none; }
+.ci-acc { font-size: 12.5px; color: var(--text-tertiary); margin-top: 8px; line-height: 1.5; }
+.ci-acc b { color: var(--text-primary); }
 .tips { list-style: none; margin: 14px 0 0; padding: 0; }
 .tip { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; font-size: 13px; color: var(--text-secondary); line-height: 1.5; border-top: 1px solid rgba(255,255,255,0.05); }
 .tip:first-child { border-top: 0; }
@@ -212,7 +224,7 @@ body::after {
           <span class="energy-when" id="energyWhen">Right now</span>
           <span class="energy-hint"><span class="dot"></span><span class="hint-txt">Hover / drag the curve</span></span>
         </div>
-        <div class="energy-desc">Your predicted energy, hour by hour — built from your caffeine, your body clock, and how long you've been awake.</div>
+        <div class="energy-desc">Your predicted energy, hour by hour — built from last night's sleep, your sleep debt, your body clock and your caffeine.</div>
         <div class="seg-toggle" id="modeToggle">
           <button data-m="line" class="on">LINE</button>
           <button data-m="bars">BARS</button>
@@ -231,6 +243,15 @@ body::after {
         <div class="plan-item"><span class="k">Peak focus</span><span class="v green" id="peakVal">—</span></div>
         <div class="plan-item"><span class="k">Predicted crash</span><span class="v amber" id="crashVal">—</span></div>
         <div class="plan-item"><span class="k">Last coffee by</span><span class="v" id="cutoffVal" style="color:#7DD3FC">—</span></div>
+      </div>
+      <div class="basis" id="energyBasis"></div>
+      <div class="ci">
+        <div class="ci-q">How's your focus right now?</div>
+        <div class="ci-row" id="ciRow" role="group" aria-label="Rate your focus">
+          <button type="button" data-r="1">1<small>Foggy</small></button><button type="button" data-r="2">2<small>Low</small></button><button type="button" data-r="3">3<small>OK</small></button><button type="button" data-r="4">4<small>Sharp</small></button><button type="button" data-r="5">5<small>Locked in</small></button>
+        </div>
+        <div class="ci-msg" id="ciMsg" aria-live="polite"></div>
+        <div class="ci-acc" id="ciAcc"></div>
       </div>
     </div>
   </div>
@@ -368,7 +389,10 @@ body::after {
   function fmtTime(ts) { const d=new Date(ts); return fmtClock(d.getHours()+d.getMinutes()/60); }
 
   /* ============ Pharmacokinetics ============ */
-  function activeAt(dose, ts, t) { const hrs=(t-ts)/3600000; return hrs<0?0:dose*Math.pow(0.5,hrs/HALF_LIFE_H); }
+  // Absorbed caffeine in the body (one-compartment, first-order absorption):
+  // rises to a peak ~45 min after the drink, then halves every 5 h.
+  const KE = Math.LN2/HALF_LIFE_H, KA = 5;
+  function activeAt(dose, ts, t) { const h=(t-ts)/3600000; return h<0?0:dose*KA/(KA-KE)*(Math.exp(-KE*h)-Math.exp(-KA*h)); }
   function totalActiveAt(t) { let s=0; for(const l of logs) s+=activeAt(l.mg,l.ts,t); return s; }
   function milestones(l) {
     const peak=l.ts+PEAK_MIN*60000, half=l.ts+HALF_LIFE_H*3600000;
@@ -377,18 +401,28 @@ body::after {
   }
 
   /* ============ Energy model (two-process + caffeine) ============ */
-  // circadian alertness, peaks ~16:30, troughs ~04:30
-  function circadian(t){ return 50 + 18*Math.cos(2*Math.PI*(t-16.5)/24); }
-  function lunchDip(t){ return 10*gauss(t,14,1.4); }
-  function sleepPressure(awakeH){ return clamp(awakeH,0,24)*1.7; }
-  function morningBump(t){ const d=t-wakeHour; return (d<0||d>4)?0:10*gauss(d,1.2,0.9); }
-  function caffeineBoostAt(t){ const a=totalActiveAt(hToTs(t)); return 34*(1-Math.exp(-a/110)); }
-  function asleepAt(t){ return (t < wakeHour) || (t >= bedHour); }
+  // Two-process model of alertness (Borbély): sleep pressure (Process S) builds
+  // while you're awake and is cleared by sleep; the body clock (Process C) is
+  // anchored to your wake time. Caffeine blocks adenosine, so it helps most
+  // when sleep pressure is high. Inputs come from your Sleep page.
+  let sleptH = 8, avgSleptH = 8, goalH = 8;
+  function S0(){ return 0.75*Math.exp(-clamp(sleptH,0,12)/4.2); }            // pressure left at wake-up
+  function pressure(t){ return 1-(1-S0())*Math.exp(-Math.max(0,t-wakeHour)/18.2); }
+  function circadian(t){ return Math.cos(2*Math.PI*(t-(wakeHour+9.5))/24); } // -1…1, high ~9.5 h after waking
+  function asleepAt(t){ const tt = t < wakeHour && t < bedHour-24 ? t+24 : t; return tt < wakeHour || tt >= bedHour; }
+  function baseAt(t){
+    const tt = t < wakeHour ? t+24 : t, S=pressure(tt);
+    return 74 + 12*circadian(tt) - 70*(S-S0())
+      - 18*Math.exp(-(tt-wakeHour)/0.6)               // sleep inertia right after waking
+      - 6*gauss(tt, wakeHour+7, 1.1)                   // post-lunch dip
+      - 3*Math.max(0, goalH-avgSleptH)                 // carried-over sleep debt (7-night average)
+      - 60*(S0()-0.11);                                // short last night
+  }
+  function caffeineBoostAt(t){ const a=totalActiveAt(hToTs(t)); const tt=t<wakeHour?t+24:t; return 26*(1-Math.exp(-a/100))*(0.6+0.8*pressure(tt)); }
   // energy with or without caffeine
   function energyAt(t, withCaf){
-    const C = circadian(t);
-    if (asleepAt(t)) return clamp(C-34, 3, 20);
-    let e = C - lunchDip(t) - sleepPressure(t-wakeHour) + morningBump(t);
+    if (asleepAt(t)) return 8;
+    let e = baseAt(t);
     if (withCaf !== false) e += caffeineBoostAt(t);
     return clamp(e, 0, 100);
   }
@@ -420,19 +454,100 @@ body::after {
     }catch(e){}
   }
 
+  /* ============ Sleep (from the Sleep page / Apple Watch) ============ */
+  let sleepSrc = null;  // { wake, bed, slept, avg, nights, source }
+  function nightsFrom(samples, manual){
+    const HR=3600000, nights={};
+    const rows=(samples||[]).map(x=>[Date.parse(x[0]),Date.parse(x[1]),x[2]]).filter(r=>r[1]>r[0]).sort((a,b)=>a[0]-b[0]);
+    const sessions=[];
+    for(const r of rows){ const c=sessions[sessions.length-1]; if(c&&r[0]<=c.end+2*HR){c.rows.push(r);c.end=Math.max(c.end,r[1]);} else sessions.push({end:r[1],rows:[r]}); }
+    const union=(iv)=>{ iv.sort((a,b)=>a[0]-b[0]); let t=0,e=-Infinity,first=null,last=null; for(const r of iv){ const a=Math.max(r[0],e); if(r[1]>a){t+=r[1]-a; if(first==null)first=r[0]; last=r[1];} e=Math.max(e,r[1]); } return {t,first,last}; };
+    for(const s of sessions){
+      let u=union(s.rows.filter(r=>['asleep','core','deep','rem'].includes(r[2])).map(r=>[r[0],r[1]]));
+      if(!u.t) u=union(s.rows.filter(r=>r[2]==='inbed').map(r=>[r[0],r[1]]));
+      if(u.t<2*HR) continue;
+      const d=new Date(u.last), k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+      if(!nights[k]||nights[k].total<u.t) nights[k]={bed:u.first,wake:u.last,total:u.t,src:'Apple Watch'};
+    }
+    Object.entries(manual||{}).forEach(([k,v])=>{ if(!v||!v.bed||!v.wake) return; const [y,m,d]=k.split('-').map(Number), [wh,wm]=v.wake.split(':').map(Number), [bh,bm]=v.bed.split(':').map(Number);
+      const wake=new Date(y,m-1,d,wh,wm).getTime(); let bed=new Date(y,m-1,d,bh,bm).getTime(); if(bed>=wake) bed-=24*HR; nights[k]={bed,wake,total:wake-bed,src:'logged'}; });
+    return nights;
+  }
+  function applySleep(samples, manual, goal){
+    const nights=nightsFrom(samples, manual), d=new Date();
+    const todayK=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    const recent=Object.keys(nights).sort().slice(-7).map(k=>nights[k]);
+    goalH = +goal || 8;
+    if(!recent.length){ sleepSrc=null; return; }
+    const clockH=(ts)=>{ const x=new Date(ts); return x.getHours()+x.getMinutes()/60; };
+    const avg=(a)=>a.reduce((t,x)=>t+x,0)/a.length;
+    const habWake=avg(recent.map(n=>clockH(n.wake)));
+    const habBed=avg(recent.map(n=>{ const h=clockH(n.bed); return h<14?h+24:h; }));  // 11 PM → 23, 1 AM → 25
+    const last=nights[todayK];
+    wakeHour = clamp(last ? clockH(last.wake) : habWake, 3, 13);
+    bedHour = clamp(habBed, 19, 28);
+    avgSleptH = avg(recent.map(n=>n.total/3600000));
+    sleptH = last ? last.total/3600000 : avgSleptH;
+    sleepSrc = { today:!!last, slept:sleptH, avg:avgSleptH, n:recent.length, src:last?last.src:'your average' };
+  }
+  function loadSleep(){
+    const cache=loadJSON('sleep:cache',{})||{};
+    applySleep(cache.samples, loadJSON('sleep:manual',{}), loadJSON('sleep:goal',8));
+    const URL_=window.DASH_SUPABASE_URL, KEY=window.DASH_SUPABASE_KEY;
+    if(!URL_||!KEY||String(URL_).indexOf('PASTE-')===0) return;
+    fetch(URL_+'/rest/v1/app_state?select=key,data&key=in.(sleep,sleep_data)',{headers:{apikey:KEY,Authorization:'Bearer '+KEY}})
+      .then(r=>r.ok?r.json():[]).then(rows=>{ const by={}; rows.forEach(r=>by[r.key]=r.data||{});
+        const st=by.sleep||{}; applySleep((by.sleep_data||{}).samples||cache.samples, st['sleep:manual']||loadJSON('sleep:manual',{}), st['sleep:goal']||loadJSON('sleep:goal',8)); renderAll(); })
+      .catch(()=>{});
+  }
+  function fmtDur(h){ const m=Math.round(h*60); return Math.floor(m/60)+'h '+String(m%60).padStart(2,'0')+'m'; }
+  function renderBasis(){
+    const el=$('energyBasis'); if(!el) return;
+    const drinks=todaysLogs(), mg=dailyTotal();
+    const sleepTxt = sleepSrc
+      ? (sleepSrc.today ? 'Woke '+fmtClock(wakeHour)+' after '+fmtDur(sleepSrc.slept)+' ('+sleepSrc.src+')' : 'No night synced for today — using your '+sleepSrc.n+'-night average ('+fmtDur(sleepSrc.avg)+', up ~'+fmtClock(wakeHour)+')')
+        + ' · '+sleepSrc.n+'-night avg '+fmtDur(sleepSrc.avg)+' vs '+goalH+'h goal'
+      : 'No sleep data yet — assuming 8h, up at 7:00 AM. Log or sync a night on the Sleep page.';
+    el.innerHTML='<b>Based on:</b> '+escapeHtml(sleepTxt)+' · bedtime ~'+fmtClock(bedHour)+' · '+(drinks.length?drinks.length+' drink'+(drinks.length>1?'s':'')+' ('+mg+' mg)':'no caffeine yet');
+  }
+
+  /* ============ Check-ins: how accurate is the curve for you? ============ */
+  const CHECK_KEY='caf:checkins';
+  let checkins = loadJSON(CHECK_KEY, []);
+  function pearson(xs, ys){ const n=xs.length, mx=xs.reduce((a,b)=>a+b,0)/n, my=ys.reduce((a,b)=>a+b,0)/n;
+    let sxy=0,sxx=0,syy=0; for(let i=0;i<n;i++){ sxy+=(xs[i]-mx)*(ys[i]-my); sxx+=(xs[i]-mx)**2; syy+=(ys[i]-my)**2; } return sxx&&syy ? sxy/Math.sqrt(sxx*syy) : 0; }
+  function checkIn(r){
+    const v=Math.round(energyAt(nowHour(), true));
+    checkins.push({ ts:Date.now(), r, p:v }); checkins=checkins.slice(-200); saveJSON(CHECK_KEY, checkins);
+    $('ciMsg').textContent='Saved — predicted '+v+'/100 right now.'; renderAccuracy(); renderChart();
+  }
+  function renderAccuracy(){
+    const el=$('ciAcc'); if(!el) return;
+    const n=checkins.length;
+    if(n<5){ el.innerHTML='Rate your focus a few times a day. After <b>5 check-ins</b> you\'ll see how well the curve matches how you actually feel ('+n+'/5 so far).'; return; }
+    const r=pearson(checkins.map(c=>c.p), checkins.map(c=>c.r));
+    const word = r>=0.6?'Strong match':r>=0.35?'Moderate match':r>=0.15?'Weak match':'Not matching yet';
+    const mae = checkins.reduce((t,c)=>t+Math.abs((10+(c.r-1)*20)-c.p),0)/n;
+    el.innerHTML='<b>'+word+'</b> · correlation '+r.toFixed(2)+' across '+n+' check-ins · off by ~'+Math.round(mae)+' points on average.'
+      + (r<0.35 ? ' Keep rating — accuracy improves once your Apple Watch sleep syncs every night.' : '');
+  }
+
   /* ============ Analysis: peak window, crash, coffee cutoff ============ */
   function sample(withCaf){ const pts=[]; for(let i=0;i<=144;i++){ const t=i/6; pts.push([t, energyAt(t, withCaf)]); } return pts; }
   function analysis(){
     const now = nowHour();
     const pts = sample(true);
-    // PEAK from now until bedtime
+    // PEAK: best stretch of today's whole waking day, so it doesn't drift as the
+    // clock moves. Only changes when you log a drink or new sleep arrives.
+    const dayEnd = Math.min(bedHour, 24);
     let peakT=null, peakV=-1;
-    for(const [t,v] of pts){ if(t>=now-0.05 && t<=bedHour && v>peakV){ peakV=v; peakT=t; } }
+    for(const [t,v] of pts){ if(t>=wakeHour+0.5 && t<=dayEnd-0.5 && v>peakV){ peakV=v; peakT=t; } }
     let pStart=peakT, pEnd=peakT;
     if(peakT!=null){
-      for(let t=peakT; t>=now; t-=1/6){ if(energyAt(t,true)>=peakV-3) pStart=t; else break; }
-      for(let t=peakT; t<=bedHour; t+=1/6){ if(energyAt(t,true)>=peakV-3) pEnd=t; else break; }
+      for(let t=peakT; t>=wakeHour; t-=1/6){ if(energyAt(t,true)>=peakV-3) pStart=t; else break; }
+      for(let t=peakT; t<=dayEnd; t+=1/6){ if(energyAt(t,true)>=peakV-3) pEnd=t; else break; }
     }
+    const peakPassed = pEnd!=null && now > pEnd;
     // CRASH: steepest sustained drop in next 8h after now
     let crashT=null, worst=0;
     for(let t=now+0.25; t<=Math.min(bedHour, now+8); t+=1/6){
@@ -443,7 +558,7 @@ body::after {
     const crashTo = crashT!=null ? Math.round(energyAt(crashT+0.5,true)) : null;
     // COFFEE CUTOFF: latest time a 95mg coffee stays <30mg by bedtime
     const cutoff = bedHour - HALF_LIFE_H*Math.log2(95/30); // hours
-    return { now, peakT, peakV:Math.round(peakV), pStart, pEnd, crashT, crashSignificant, crashTo, cutoff };
+    return { now, peakT, peakV:Math.round(peakV), pStart, pEnd, peakPassed, crashT, crashSignificant, crashTo, cutoff };
   }
 
   /* ============ Rendering ============ */
@@ -477,7 +592,9 @@ body::after {
     // night shading (asleep regions)
     const nightFill='rgba(255,255,255,0.025)';
     parts.push('<rect x="0" y="0" width="'+X(wakeHour)+'" height="'+H+'" fill="'+nightFill+'"/>');
-    parts.push('<rect x="'+X(bedHour)+'" y="0" width="'+(W-X(bedHour))+'" height="'+H+'" fill="'+nightFill+'"/>');
+    if (bedHour < 24) parts.push('<rect x="'+X(bedHour)+'" y="0" width="'+(W-X(bedHour))+'" height="'+H+'" fill="'+nightFill+'"/>');
+    // peak window band
+    const pa=analysis(); if(pa.peakT!=null) parts.push('<rect x="'+X(pa.pStart).toFixed(1)+'" y="0" width="'+Math.max(2,X(pa.pEnd)-X(pa.pStart)).toFixed(1)+'" height="'+H+'" fill="rgba(107,227,164,0.07)"/>');
     // gridlines
     for(let g=25;g<=100;g+=25){ const y=Y(g).toFixed(1); parts.push('<line x1="0" y1="'+y+'" x2="'+W+'" y2="'+y+'" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>'); }
 
@@ -514,6 +631,9 @@ body::after {
       parts.push('<path d="'+line+'" fill="none" stroke="#6BE3A4" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" style="filter:drop-shadow(0 0 6px rgba(107,227,164,0.55))"/>');
     }
 
+    // your focus check-ins today (1–5 → 10–90)
+    const s0=startOfToday();
+    checkins.filter(c=>c.ts>=s0).forEach(c=>{ const h=(c.ts-s0)/3600000; parts.push('<circle cx="'+X(h).toFixed(1)+'" cy="'+Y(10+(c.r-1)*20).toFixed(1)+'" r="5" fill="#F2C063" stroke="#0e0e10" stroke-width="2"/>'); });
     // markers: now + scrub
     const xNow=X(now).toFixed(1);
     parts.push('<line x1="'+xNow+'" y1="0" x2="'+xNow+'" y2="'+H+'" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/>');
@@ -534,7 +654,8 @@ body::after {
     $('cutoffVal').textContent = fmtClock(a.cutoff);
     // tiles
     $('mPeak').textContent = a.peakT!=null ? fmtClock(a.peakT) : '—';
-    $('mPeakSub').textContent = a.peakT!=null ? ('Energy ~'+a.peakV+'/100 · window '+fmtClock(a.pStart)+'–'+fmtClock(a.pEnd)) : 'Log a drink to see your curve.';
+    $('mPeakSub').textContent = a.peakT!=null ? ('Energy ~'+a.peakV+'/100 · window '+fmtClock(a.pStart)+'–'+fmtClock(a.pEnd)+(a.peakPassed?' (earlier today)':'')) : 'Log a drink to see your curve.';
+    renderBasis(); renderAccuracy();
     if(a.crashSignificant){ $('mCrash').textContent = fmtClock(a.crashT); $('mCrashSub').textContent = 'Drops toward ~'+a.crashTo+'/100 — plan lighter work then.'; }
     else { $('mCrash').textContent = 'No crash'; $('mCrashSub').textContent = 'No steep drop predicted in the next several hours.'; }
     $('mCutoff').textContent = fmtClock(a.cutoff);
@@ -632,7 +753,9 @@ body::after {
   $('customAdd').addEventListener('click',addCustom);
   $('customMg').addEventListener('keydown',(e)=>{ if(e.key==='Enter') addCustom(); });
 
+  $('ciRow').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>checkIn(+b.dataset.r)));
   readProfile();
+  loadSleep();
   renderResults('');
   renderAll();
   loadWhoop();
@@ -640,8 +763,8 @@ body::after {
 
   /* ============ Cloud sync ============ */
   if(window.initCloudSync){
-    window.initCloudSync({ appKey:'caffeine', syncedKeys:[LOGS_KEY,CUSTOM_KEY],
-      onApplied:function(){ logs=loadJSON(LOGS_KEY,[]); custom=loadJSON(CUSTOM_KEY,[]); renderResults($('search').value); renderAll(); } });
+    window.initCloudSync({ appKey:'caffeine', syncedKeys:[LOGS_KEY,CUSTOM_KEY,CHECK_KEY],
+      onApplied:function(){ logs=loadJSON(LOGS_KEY,[]); custom=loadJSON(CUSTOM_KEY,[]); checkins=loadJSON(CHECK_KEY,[]); renderResults($('search').value); renderAll(); } });
   }
 })();
 
