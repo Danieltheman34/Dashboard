@@ -987,9 +987,16 @@ main {
     // bottom tab bar. Move the sheet and toast to <body> so they sit on top of it.
     document.body.appendChild(sheetBg); document.body.appendChild($('fuToast'));
     function openSheet(title, html) { $('fuSheetTitle').textContent = title; sheetBody.innerHTML = html; sheetBg.classList.add('open'); document.body.style.overflow = 'hidden'; }
-    function closeSheet() { sheetBg.classList.remove('open'); document.body.style.overflow = ''; }
+    function closeSheet() { sheetBg.classList.remove('open'); document.body.style.overflow = ''; sheetBg.style.top = sheetBg.style.height = sheetBg.style.bottom = ''; }
     $('fuClose').addEventListener('click', closeSheet);
-    sheetBg.addEventListener('click', (e) => { if (e.target === sheetBg) closeSheet(); });
+    // Tapping the dimmed area only closes simple sheets — never one with a photo or
+    // fields (a stray tap while the keyboard is up used to throw the photo away).
+    sheetBg.addEventListener('click', (e) => { if (e.target === sheetBg && !sheetBody.querySelector('input, textarea, .fu-photo')) closeSheet(); });
+    // Keep the sheet above the iPhone keyboard.
+    if (window.visualViewport) {
+      const fit = () => { if (!sheetBg.classList.contains('open')) return; const v = window.visualViewport; sheetBg.style.top = v.offsetTop + 'px'; sheetBg.style.height = v.height + 'px'; sheetBg.style.bottom = 'auto'; };
+      window.visualViewport.addEventListener('resize', fit); window.visualViewport.addEventListener('scroll', fit);
+    }
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && sheetBg.classList.contains('open')) closeSheet(); });
 
     function apiKey() { try { return localStorage.getItem(NOVA_KEY) || ''; } catch { return ''; } }
@@ -1032,7 +1039,24 @@ main {
     }
 
     // ---------- Snap / Add food ----------
-    $('fuSnap').addEventListener('click', () => { $('fuFile').value = ''; $('fuFile').click(); });
+    const PENDING_KEY = 'meals:pending';  // sessionStorage: { photo, thumb, note, t }
+    function getPending() { try { const p = JSON.parse(sessionStorage.getItem(PENDING_KEY)); return p && Date.now() - p.t < 60 * 60e3 ? p : null; } catch { return null; } }
+    function setPending(p) { try { sessionStorage.setItem(PENDING_KEY, JSON.stringify(Object.assign({ t: Date.now() }, p))); } catch {} }
+    function clearPending() { try { sessionStorage.removeItem(PENDING_KEY); } catch {} }
+    function newPhoto() { $('fuFile').value = ''; $('fuFile').click(); }
+    function photoStep({ photo, thumb, note }) {
+      openSheet('Snap a meal', '<img class="fu-photo" src="' + photo + '" alt="Meal photo">' + keyField()
+        + '<label class="fu-note-lbl" for="fuNote">Explain anything? <span>Optional</span></label>'
+        + '<textarea class="fu-in" id="fuNote" placeholder="e.g. cooked in butter · 8 oz chicken · 2 tortillas · I only ate half">' + esc(note || '') + '</textarea>'
+        + '<button class="fu-btn" id="fuGo" type="button">Analyze meal</button>'
+        + '<button class="fu-link" id="fuRetake" type="button" style="display:block;margin:14px auto 0">Retake photo</button>');
+      // Save the note as you type so nothing is lost.
+      $('fuNote').addEventListener('input', () => setPending({ photo, thumb, note: $('fuNote').value }));
+      $('fuGo').addEventListener('click', () => { const n = $('fuNote').value.trim(); setPending({ photo, thumb, note: n }); analyze({ photo, thumb, note: n }); });
+      $('fuRetake').addEventListener('click', () => { clearPending(); newPhoto(); });
+    }
+    // Snap → continue with the unsaved photo if there is one, otherwise open the camera.
+    $('fuSnap').addEventListener('click', () => { const p = getPending(); if (p) photoStep(p); else newPhoto(); });
     $('fuFile').addEventListener('change', async () => {
       const file = $('fuFile').files && $('fuFile').files[0];
       if (!file) return;
@@ -1040,11 +1064,8 @@ main {
       try { img = await loadImage(file); } catch (e) { openSheet('Snap a meal', '<div class="fu-err">' + esc(e.message) + '</div>'); return; }
       const photo = toJpeg(img, 1280, 0.82), thumb = squareThumb(img);
       // Photo first, then an optional note (what the photo can't show), then Analyze.
-      openSheet('Snap a meal', '<img class="fu-photo" src="' + photo + '" alt="Meal photo">' + keyField()
-        + '<label class="fu-note-lbl" for="fuNote">Explain anything? <span>Optional</span></label>'
-        + '<textarea class="fu-in" id="fuNote" placeholder="e.g. cooked in butter · 8 oz chicken · 2 tortillas · I only ate half"></textarea>'
-        + '<button class="fu-btn" id="fuGo" type="button">Analyze meal</button>');
-      $('fuGo').addEventListener('click', () => analyze({ photo, thumb, note: $('fuNote').value.trim() }));
+      setPending({ photo, thumb, note: '' });
+      photoStep({ photo, thumb, note: '' });
     });
     function openAddFood(prefill, err) {
       openSheet('Add food', (err ? '<div class="fu-err">' + esc(err) + '</div>' : '') + keyField()
@@ -1222,6 +1243,7 @@ main {
         + (isNew && photo ? '<details class="fu-fix"><summary>Something off? Add details</summary>'
           + '<textarea class="fu-in" id="fuFixNote" placeholder="e.g. cooked in butter, 2 tortillas, 8 oz chicken">' + esc(meal.note || '') + '</textarea>'
           + '<button class="fu-btn ghost" id="fuFixGo" type="button">Re-analyze with details</button></details>' : '')
+        + (isNew && photo ? '<button class="fu-link" id="fuBackPhoto" type="button" style="margin:0 0 10px">‹ Back to photo &amp; note</button>' : '')
         + '<div class="fu-hint-edit">Wrong food or amount? Change it and the macros update.</div>'
         + '<div id="fuItems"></div>'
         + '<button class="fu-btn ghost" id="fuAddItem" type="button">+ Add item</button>'
@@ -1299,6 +1321,7 @@ main {
         $('fuStar').classList.toggle('on', favWanted);
         $('fuStar').textContent = favWanted ? '★ Favorite' : '☆ Favorite';
       });
+      if ($('fuBackPhoto')) $('fuBackPhoto').addEventListener('click', () => photoStep(getPending() || { photo, thumb: th, note: meal.note || '' }));
       if ($('fuFixGo')) $('fuFixGo').addEventListener('click', () => analyze({ photo, thumb: th, note: $('fuFixNote').value.trim() }));
       $('fuAddItem').addEventListener('click', () => { items.push(Object.assign(blankItem(), { _base: { g: 0, kcal: 0, p: 0, c: 0, f: 0, fib: 0 } })); drawItems(); drawTot(); });
       const clean = () => items.filter((i) => String(i.name).trim() || i.kcal).map((i) => { const o = Object.assign({}, i); delete o._base; delete o._busy; delete o._err; return o; });
@@ -1315,9 +1338,10 @@ main {
         saveMeals(k, arr);
         if (thumb) saveThumb(meal.id, thumb);
         if (favWanted || isFav()) syncFav(meal.name);
+        if (isNew && photo) clearPending();
         closeSheet(); render();
       });
-      if (isNew) $('fuCancel').addEventListener('click', closeSheet);
+      if (isNew) $('fuCancel').addEventListener('click', () => { if (photo) clearPending(); closeSheet(); });
       else {
         $('fuDelete').addEventListener('click', () => {
           const prev = mealsFor(k);
@@ -1373,6 +1397,8 @@ main {
       lastToday = nowKey; render();
     });
     render();
+    const pend = getPending();
+    if (pend && Date.now() - pend.t < 15 * 60e3) photoStep(pend);
   })();
   </script>
 

@@ -154,7 +154,7 @@
     let sy = null, sx = null, pull = 0, edge = false;
     const locked = () => document.body.style.overflow === 'hidden' || document.documentElement.style.overflow === 'hidden';
     document.addEventListener('touchstart', (e) => {
-      if (e.touches.length !== 1 || locked()) { sy = null; return; }
+      if (e.touches.length !== 1 || locked() || (e.target.closest && e.target.closest('input, textarea, select, [role=dialog]'))) { sy = null; return; }
       const t = e.touches[0];
       sx = t.clientX; sy = t.clientY; pull = 0;
       edge = sx < 22 && history.length > 1;
