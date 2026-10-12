@@ -675,7 +675,17 @@ main {
     .fu-item-mac { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 8px; }
     .fu-item-mac label { font-family: var(--font-mono); font-size: 9px; color: var(--mute); letter-spacing: 0.14em; text-transform: uppercase; }
     .fu-item-mac .fu-in { padding: 7px 8px; font-size: 13.5px; margin-top: 3px; font-variant-numeric: tabular-nums; }
-    .fu-portion { font-size: 11.5px; color: var(--mute); margin-top: 6px; font-style: italic; }
+    .fu-amt { display: grid; grid-template-columns: 70px 1fr; align-items: center; gap: 8px; margin-top: 8px; }
+    .fu-amt label { font-family: var(--font-mono); font-size: 11px; color: var(--mute); letter-spacing: 0.14em; text-transform: uppercase; }
+    .fu-amt .fu-in { padding: 8px 10px; margin: 0; }
+    .fu-upd { font-size: 12px; color: var(--mint); margin-top: 6px; min-height: 0; }
+    .fu-upd:empty { display: none; }
+    .fu-item.busy { opacity: 0.6; pointer-events: none; }
+    .fu-item.busy .fu-upd::before { content: ''; display: inline-block; width: 10px; height: 10px; margin-right: 6px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; vertical-align: -1px; animation: fuSpin .8s linear infinite; }
+    @keyframes fuSpin { to { transform: rotate(360deg); } }
+    .fu-note-lbl { display: flex; justify-content: space-between; font-size: 13px; color: var(--ink); margin: 4px 0 6px; }
+    .fu-note-lbl span { color: var(--mute); font-size: 12px; }
+    .fu-hint-edit { font-size: 12px; color: var(--mute); margin: -2px 0 10px; }
     .fu-slots { display: flex; gap: 6px; flex-wrap: wrap; margin: 12px 0 2px; align-items: center; }
     .fu-slot { padding: 7px 12px; border-radius: 999px; border: 1px solid var(--line-2); background: none; color: var(--dim); font-family: inherit; font-size: 12.5px; cursor: pointer; }
     .fu-slot.on { background: rgba(134,239,192,0.12); border-color: rgba(134,239,192,0.5); color: var(--mint); }
@@ -1029,10 +1039,10 @@ main {
       let img;
       try { img = await loadImage(file); } catch (e) { openSheet('Snap a meal', '<div class="fu-err">' + esc(e.message) + '</div>'); return; }
       const photo = toJpeg(img, 1280, 0.82), thumb = squareThumb(img);
-      // Ready to go → analyze straight away; details can be added on the review screen.
-      if (canAI()) { openSheet('Snap a meal', ''); analyze({ photo, thumb, note: '' }); return; }
+      // Photo first, then an optional note (what the photo can't show), then Analyze.
       openSheet('Snap a meal', '<img class="fu-photo" src="' + photo + '" alt="Meal photo">' + keyField()
-        + '<textarea class="fu-in" id="fuNote" placeholder="Optional: anything the photo can\'t show — cooked in butter, 2 tortillas, 8 oz chicken"></textarea>'
+        + '<label class="fu-note-lbl" for="fuNote">Explain anything? <span>Optional</span></label>'
+        + '<textarea class="fu-in" id="fuNote" placeholder="e.g. cooked in butter · 8 oz chicken · 2 tortillas · I only ate half"></textarea>'
         + '<button class="fu-btn" id="fuGo" type="button">Analyze meal</button>');
       $('fuGo').addEventListener('click', () => analyze({ photo, thumb, note: $('fuNote').value.trim() }));
     });
@@ -1124,6 +1134,13 @@ main {
       + 'Use visual cues for scale (plate, utensils, hands, packaging). Include cooking oils, butter, sauces and dressings you can see or that the dish normally contains, as separate items when they are significant. '
       + 'If the user adds details, they override what you infer from the photo. Give realistic best estimates rather than lowballing; when unsure, say so in the notes. '
       + 'Name the meal in a few words, like a food diary entry.';
+    // One food at a stated amount (used when you edit an item on the review screen).
+    const ITEM_SYSTEM = 'You are a sports nutritionist. Estimate the nutrition of ONE food at the amount given, using standard USDA-style values for the food as served. '
+      + 'Convert household amounts (cups, oz, slices, pieces, tbsp) to grams. If no amount is given, assume one typical serving. '
+      + 'Return the amount as a short household measure in "portion" (e.g. "1 cup", "6 oz").';
+    const ITEM_SCHEMA = { type: 'object', additionalProperties: false,
+      required: ['portion', 'grams', 'calories', 'protein_g', 'carbs_g', 'fat_g', 'fiber_g'],
+      properties: { portion: { type: 'string' }, grams: { type: 'number' }, calories: { type: 'number' }, protein_g: { type: 'number' }, carbs_g: { type: 'number' }, fat_g: { type: 'number' }, fiber_g: { type: 'number' } } };
     const SCHEMA = {
       type: 'object', additionalProperties: false,
       required: ['meal_name', 'items', 'confidence', 'notes'],
@@ -1205,6 +1222,7 @@ main {
         + (isNew && photo ? '<details class="fu-fix"><summary>Something off? Add details</summary>'
           + '<textarea class="fu-in" id="fuFixNote" placeholder="e.g. cooked in butter, 2 tortillas, 8 oz chicken">' + esc(meal.note || '') + '</textarea>'
           + '<button class="fu-btn ghost" id="fuFixGo" type="button">Re-analyze with details</button></details>' : '')
+        + '<div class="fu-hint-edit">Wrong food or amount? Change it and the macros update.</div>'
         + '<div id="fuItems"></div>'
         + '<button class="fu-btn ghost" id="fuAddItem" type="button">+ Add item</button>'
         + '<div class="fu-row2">' + (isNew ? '<button class="fu-btn ghost" id="fuCancel" type="button">Cancel</button>' : '<button class="fu-btn danger" id="fuDelete" type="button">Delete</button>')
@@ -1225,12 +1243,20 @@ main {
           + '<div class="fu-g"><input class="fu-in" data-f="g" inputmode="decimal" value="' + (i.g || '') + '" placeholder="0"><span>g</span></div>'
           + '<button class="fu-del" type="button" aria-label="Remove item">×</button></div>'
           + '<div class="fu-item-mac">' + ['kcal', 'p', 'c', 'f'].map((f) => '<div><label>' + ({ kcal: 'kcal', p: 'protein', c: 'carbs', f: 'fat' })[f] + '</label><input class="fu-in" data-f="' + f + '" inputmode="decimal" value="' + (i[f] || 0) + '"></div>').join('')
-          + '</div>' + (i.portion ? '<div class="fu-portion">' + esc(i.portion) + '</div>' : '') + '</div>').join('');
+          + '</div><div class="fu-amt"><label>Amount</label><input class="fu-in" data-f="portion" value="' + esc(i.portion || '') + '" placeholder="e.g. 1 cup, 6 oz, 2 slices" enterkeyhint="done"></div>'
+          + '<div class="fu-upd" aria-live="polite">' + (i._busy ? 'Updating macros…' : i._err ? esc(i._err) : '') + '</div></div>').join('');
         $('fuItems').querySelectorAll('.fu-item').forEach((row) => {
           const i = items[Number(row.dataset.n)];
+          if (i._busy) row.classList.add('busy');
+          // Changing the food or its amount → ask Claude for that item's macros (on blur / Done).
+          row.querySelectorAll('[data-f="name"], [data-f="portion"]').forEach((inp) => {
+            inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); inp.blur(); } });
+            inp.addEventListener('change', () => reestimate(i));
+          });
           row.querySelectorAll('input').forEach((inp) => inp.addEventListener('input', () => {
             const f = inp.dataset.f;
             if (f === 'name') { i.name = inp.value; return; }
+            if (f === 'portion') { i.portion = inp.value; return; }
             const v = parseFloat(inp.value) || 0;
             if (f === 'g') {
               i.g = v;
@@ -1248,6 +1274,19 @@ main {
           row.querySelector('.fu-del').addEventListener('click', () => { items.splice(Number(row.dataset.n), 1); drawItems(); drawTot(); });
         });
       }
+      async function reestimate(i) {
+        if (!String(i.name).trim() || !canAI()) return;
+        i._busy = true; i._err = ''; drawItems();
+        try {
+          const r = await callClaude([{ type: 'text', text: 'Food: ' + i.name + '\nAmount: ' + (i.portion || (i.g ? i.g + ' g' : 'one typical serving'))
+            + '\nPart of: ' + ($('fuName') ? $('fuName').value : meal.name) + (meal.note ? '\nDetails from me: ' + meal.note : '') }],
+            ITEM_SYSTEM, ITEM_SCHEMA, 'low');
+          Object.assign(i, { portion: r.portion || i.portion, g: r0(r.grams), kcal: r0(r.calories), p: r1(r.protein_g), c: r1(r.carbs_g), f: r1(r.fat_g), fib: r1(r.fiber_g) });
+          i._base = { g: i.g, kcal: i.kcal, p: i.p, c: i.c, f: i.f, fib: i.fib };
+        } catch (e) { i._err = 'Couldn\'t update — ' + (e.message || e) + ' You can type the numbers.'; }
+        i._busy = false;
+        if (items.includes(i) && $('fuItems')) { drawItems(); drawTot(); }
+      }
       drawItems(); drawTot();
       $('fuSlots').addEventListener('click', (e) => {
         const b = e.target.closest('.fu-slot'); if (!b) return;
@@ -1262,7 +1301,7 @@ main {
       });
       if ($('fuFixGo')) $('fuFixGo').addEventListener('click', () => analyze({ photo, thumb: th, note: $('fuFixNote').value.trim() }));
       $('fuAddItem').addEventListener('click', () => { items.push(Object.assign(blankItem(), { _base: { g: 0, kcal: 0, p: 0, c: 0, f: 0, fib: 0 } })); drawItems(); drawTot(); });
-      const clean = () => items.filter((i) => String(i.name).trim() || i.kcal).map((i) => { const o = Object.assign({}, i); delete o._base; return o; });
+      const clean = () => items.filter((i) => String(i.name).trim() || i.kcal).map((i) => { const o = Object.assign({}, i); delete o._base; delete o._busy; delete o._err; return o; });
       function syncFav(name) {
         let list = favs().filter((f) => f.id !== (meal.favId || meal.id) && f.name !== name);
         if (favWanted) { list.unshift({ id: meal.favId || meal.id, name, items: clean() }); list = list.slice(0, 12); }
