@@ -43,8 +43,10 @@ export default async function handler(req, res) {
 
   let body = req.body;
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = {}; } }
-  const token = body && String(body.token || '').trim();
-  const raw = body && body.samples;
+  // Field names are matched case-insensitively (Shortcuts users often type "Token").
+  const field = (name) => { if (!body || typeof body !== 'object') return undefined; const k = Object.keys(body).find((x) => x.trim().toLowerCase() === name); return k === undefined ? undefined : body[k]; };
+  const token = String(field('token') || '').trim();
+  const raw = field('samples');
   if (!token) return res.status(400).json({ error: 'token required' });
   if (!raw) return res.status(400).json({ error: 'samples required' });
 
@@ -59,7 +61,8 @@ export default async function handler(req, res) {
     const incoming = [];
     let bad = 0;
     for (const line of lines) {
-      const [a, b, v] = line.split('|').map((x) => (x || '').trim());
+      const [a, b, ...rest] = line.split('|').map((x) => (x || '').trim());
+      const v = rest.join(' ');  // "Value" or a whole Repeat Item — both mention the stage
       const start = new Date(a), end = new Date(b), stage = stageOf(v);
       if (isNaN(start) || isNaN(end) || !stage || end <= start) { bad++; continue; }
       incoming.push([a, b, stage]);
@@ -89,8 +92,10 @@ export default async function handler(req, res) {
     const added = samples.length - before;
     return res.status(200).json({
       ok: true, received: lines.length, added: Math.max(0, added), skipped: bad,
-      message: bad && !incoming.length
-        ? 'None of the samples could be read. Make sure the dates use ISO 8601 format.'
+      sample: lines[0] ? lines[0].slice(0, 160) : '',
+      message: !lines.length ? 'No sleep found in Health for the last 2 days.'
+        : bad && !incoming.length
+        ? 'None of the samples could be read. Tap Start Date and End Date in the Text action and set Date Format to ISO 8601 (with time). First line received: ' + lines[0].slice(0, 120)
         : 'Synced ' + incoming.length + ' sleep samples (' + Math.max(0, added) + ' new).',
     });
   } catch (e) {
