@@ -1575,13 +1575,32 @@ img, video, canvas, svg { max-width: 100%; }
     // ---------- Workout helpers ----------
     // Lyfta leaves is_completed false unless each set is ticked off, so any set
     // with reps or a time counts as done.
-    function doneSets(ex) { return (ex.sets || []).filter((s) => num(s.reps) > 0 || num(s.duration) > 0); }
+    // Lyfta writes durations as "mm:ss" (or "h:mm:ss"): "20:00" is 20 minutes, "00:30" is 30 s.
+    function durSec(v) {
+      if (v == null || v === '') return 0;
+      const p = String(v).split(':').map(Number);
+      if (p.some((x) => !isFinite(x))) return 0;
+      return p.length === 3 ? p[0] * 3600 + p[1] * 60 + p[2] : p.length === 2 ? p[0] * 60 + p[1] : p[0];
+    }
+    function doneSets(ex) { return (ex.sets || []).filter((s) => num(s.reps) > 0 || durSec(s.duration) > 0); }
+    // Treadmill walks, runs, bikes, rowers… count as cardio, not lifting sets.
+    const CARDIO_RE = /walk|treadmill|\brun|jog|sprint|cycl|bike|elliptical|stair|step ?mill|rowing machine|rower|swim|jump rope|skipping|hike/i;
+    function isCardioEx(ex) { const n = ex.excercise_name || ''; return ex.exercise_type === 'distance_duration' || (CARDIO_RE.test(n) && !/lunge|carry|farmer|press|curl|row(?!ing machine)/i.test(n)); }
+    function liftExs(w) { return (w.exercises || []).filter((ex) => !isCardioEx(ex) && doneSets(ex).length); }
+    function cardioExs(w) { return (w.exercises || []).filter((ex) => isCardioEx(ex) && doneSets(ex).length); }
+    function fmtSetDur(sec) { return sec >= 60 ? (Math.round(sec / 6) / 10).toString().replace(/\.0$/, '') + ' min' : sec + 's'; }
+    function setLabel(st) { return num(st.weight) ? fmtW(num(st.weight)) + '×' + num(st.reps) : num(st.reps) ? num(st.reps) + ' reps' : fmtSetDur(durSec(st.duration)); }
+    // "20 min · 1.11 mi" for a cardio exercise (all its sets added up).
+    function cardioSummary(ex) {
+      const sets = doneSets(ex), sec = sets.reduce((t, x) => t + durSec(x.duration), 0), mi = sets.reduce((t, x) => t + num(x.distance), 0);
+      return [sec ? fmtSetDur(sec) : '', mi ? (Math.round(mi * 100) / 100) + ' mi' : '', sec && mi ? (sec / 60 / mi).toFixed(0) + ':' + String(Math.round((sec / mi) % 60)).padStart(2, '0') + ' /mi' : ''].filter(Boolean).join(' · ');
+    }
     function wDate(w) { return new Date(w.workout_perform_date); }
     function wVolume(w) {
       if (w.total_volume) return num(w.total_volume);
       return (w.exercises || []).reduce((t, ex) => t + doneSets(ex).reduce((a, s) => a + num(s.weight) * num(s.reps), 0), 0);
     }
-    function wSets(w) { return (w.exercises || []).reduce((t, ex) => t + doneSets(ex).length, 0); }
+    function wSets(w) { return liftExs(w).reduce((t, ex) => t + doneSets(ex).length, 0); }
     function inRange(from) { return workouts.filter((w) => wDate(w) >= from); }
     function stravaActs() { return window.svActivities || []; }
     // Strava activity recorded around the same time as a Lyfta workout.
@@ -1692,8 +1711,9 @@ img, video, canvas, svg { max-width: 100%; }
       $('trWkTime').textContent = secs ? fmtDur(secs) : '—';
       const vol = wk.reduce((t, w) => t + wVolume(w), 0);
       $('trWeekTitle').textContent = wk.length ? fmtVol(vol) + ' ' + unit() + ' lifted' : 'No lifts yet this week';
-      const liftDays = new Set(workouts.map((w) => dayKey(w.workout_perform_date)));
-      const cardioDays = new Set(stravaActs().filter((a) => !isLift(a)).map((a) => a.start_date_local.slice(0, 10)));
+      const liftDays = new Set(workouts.filter((w) => liftExs(w).length).map((w) => dayKey(w.workout_perform_date)));
+      const cardioDays = new Set(stravaActs().filter((a) => !isLift(a)).map((a) => a.start_date_local.slice(0, 10))
+        .concat(workouts.filter((w) => cardioExs(w).length).map((w) => dayKey(w.workout_perform_date))));
       // Last week and this week, Monday → Sunday. Tap a day to see what was done.
       const today = dayKey(daysAgo(0)), mon = startOfWeek();
       let html = '';
@@ -1727,12 +1747,16 @@ img, video, canvas, svg { max-width: 100%; }
       let html = '<div class="tr-dayview-h">' + esc(label) + '</div>';
       lifts.forEach((w) => {
         const a = stravaFor(w);
-        const exs = (w.exercises || []).filter((ex) => doneSets(ex).length);
+        cardioExs(w).forEach((ex) => {
+          html += '<div class="tr-dv-item"><div class="tr-dv-ico cardio">' + (/walk|hike/i.test(ex.excercise_name) ? '🚶' : /bike|cycl/i.test(ex.excercise_name) ? '🚴' : /row/i.test(ex.excercise_name) ? '🚣' : /stair|step/i.test(ex.excercise_name) ? '🪜' : '🏃') + '</div><div style="flex:1;min-width:0">'
+            + '<div class="tr-dv-name">' + esc(ex.excercise_name) + '</div><div class="tr-dv-meta">Cardio · ' + esc(cardioSummary(ex)) + '</div></div></div>';
+        });
+        const exs = liftExs(w);
+        if (!exs.length) return;
         html += '<div class="tr-dv-item"><div class="tr-dv-ico lift">🏋️</div><div style="flex:1;min-width:0">'
           + '<div class="tr-dv-name">' + esc(w.title || 'Workout') + '</div>'
           + '<div class="tr-dv-meta">' + [a ? fmtDur(a.moving_time || a.elapsed_time) : '', wSets(w) + ' sets', fmtVol(wVolume(w)) + ' ' + u].filter(Boolean).join(' · ') + '</div>'
-          + '<div class="tr-dv-ex">' + exs.map((ex) => '<b>' + esc(ex.excercise_name) + '</b> — ' + doneSets(ex).map((st) =>
-              num(st.weight) ? fmtW(num(st.weight)) + '×' + num(st.reps) : num(st.reps) ? num(st.reps) + ' reps' : num(st.duration) + 's').join(', ')).join('<br>') + '</div>'
+          + '<div class="tr-dv-ex">' + exs.map((ex) => '<b>' + esc(ex.excercise_name) + '</b> — ' + doneSets(ex).map(setLabel).join(', ')).join('<br>') + '</div>'
           + '<button type="button" class="tr-dv-open" data-i="' + workouts.indexOf(w) + '">Open full workout ↓</button></div></div>';
       });
       cardio.forEach((a) => {
@@ -1849,10 +1873,10 @@ img, video, canvas, svg { max-width: 100%; }
         return '<div class="tr-ex"><div class="tr-ex-top">'
           + (ex.exercise_image ? '<img class="tr-ex-img" src="' + esc(ex.exercise_image) + '" alt="" loading="lazy">' : '')
           + '<div style="flex:1;min-width:0"><div class="tr-ex-name">' + esc(ex.excercise_name) + '</div>'
-          + '<div class="tr-ex-meta">' + sets.length + ' sets' + (vol ? ' · ' + fmtVol(vol) + ' ' + u : '') + (m ? ' · ' + esc(m) : '') + '</div></div>'
+          + '<div class="tr-ex-meta">' + (isCardioEx(ex) ? 'Cardio · ' + esc(cardioSummary(ex)) : sets.length + ' sets' + (vol ? ' · ' + fmtVol(vol) + ' ' + u : '') + (m ? ' · ' + esc(m) : '')) + '</div></div>'
           + (isPR ? '<span class="tr-pr">PR</span>' : '') + '</div>'
           + '<div class="tr-sets">' + sets.map((s) => {
-              const label = num(s.weight) ? fmtW(num(s.weight)) + '×' + num(s.reps) : num(s.reps) ? num(s.reps) + ' reps' : num(s.duration) + 's';
+              const label = setLabel(s);
               return '<span class="tr-set' + (s === top ? ' top' : '') + '">' + label + '</span>';
             }).join('') + '</div></div>';
       }).join('')
