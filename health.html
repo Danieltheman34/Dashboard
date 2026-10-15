@@ -715,7 +715,7 @@ main {
         <span class="fu-mono fu-date" id="fuDate">—</span>
         <button class="fu-arrow" id="fuPrev" type="button" aria-label="Previous day">‹</button>
         <button class="fu-arrow" id="fuNext" type="button" aria-label="Next day">›</button>
-        <div class="fu-seg" id="fuType"><button type="button" data-t="gym">Gym day</button><button type="button" data-t="rest">Rest day</button></div>
+        <div class="fu-seg" id="fuType" hidden style="display:none"><button type="button" data-t="gym">Gym day</button><button type="button" data-t="rest">Rest day</button></div>
         <span class="fu-streak" id="fuStreak" hidden></span>
       </div>
     </header>
@@ -826,7 +826,8 @@ main {
       const coach = readLS('po_coach_v1', {});
       return Object.values(coach.logs || {}).some((arr) => (arr || []).some((l) => l.date && dayKey(new Date(l.date)) === k));
     }
-    function dayType(k) { const t = readLS(TYPE_PREFIX + k, null); return t === 'gym' || t === 'rest' ? t : trainedOn(k) ? 'gym' : 'rest'; }
+    // One set of daily goals now (the Gym day / Rest day switch was removed).
+    function dayType() { return 'gym'; }
     function goalsFor(k) { return allGoals()[dayType(k)]; }
     function mealsFor(k) { return readLS(DAY_PREFIX + k, []); }
     function saveMeals(k, arr) { if (arr.length) writeLS(DAY_PREFIX + k, arr); else removeLS(DAY_PREFIX + k); }
@@ -1366,9 +1367,8 @@ main {
       const all = allGoals();
       let tab = dayType(dayKey(viewDate));
       const fields = [['kcal', 'Calories'], ['p', 'Protein (g)'], ['c', 'Carbs (g)'], ['f', 'Fat (g)']];
-      openSheet('Daily goals', '<div class="fu-seg fu-goal-tabs" id="fuGoalTab"><button type="button" data-t="gym">Gym day</button><button type="button" data-t="rest">Rest day</button></div>'
+      openSheet('Daily goals', '<div class="fu-seg fu-goal-tabs" id="fuGoalTab" hidden style="display:none"><button type="button" data-t="gym">Gym day</button><button type="button" data-t="rest">Rest day</button></div>'
         + '<div class="fu-goal-grid" id="fuGoalGrid"></div><div class="fu-hint" id="fuGoalHint"></div>'
-        + '<div class="fu-hint">Gym day is picked automatically on days you lift (from Lyfta / your Fitness log). Tap Gym day / Rest day at the top to override a day.</div>'
         + '<div class="fu-row2"><button class="fu-btn ghost" id="fuCancel" type="button">Cancel</button><button class="fu-btn" id="fuSave" type="button">Save goals</button></div>');
       const read = () => sheetBody.querySelectorAll('[data-g]').forEach((i) => { all[tab][i.dataset.g] = Math.max(0, r0(i.value)); });
       const draw = () => {
@@ -1383,7 +1383,7 @@ main {
       $('fuGoalTab').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; read(); tab = b.dataset.t; draw(); });
       draw();
       $('fuCancel').addEventListener('click', closeSheet);
-      $('fuSave').addEventListener('click', () => { read(); writeLS(GOALS_KEY, all); closeSheet(); render(); });
+      $('fuSave').addEventListener('click', () => { read(); all.rest = Object.assign({}, all.gym); writeLS(GOALS_KEY, all); closeSheet(); render(); });
     });
 
     // Re-render when synced data arrives from another device (sync.js fires 'storage').

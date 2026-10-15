@@ -32,6 +32,20 @@
     let pushTimer = null;
     let suppressSync = false;
     let lastSyncedJson = null;
+    // Nothing is uploaded until the first cloud pull has been merged in; an
+    // early upload would be followed by that (older) pull overwriting it.
+    let ready = false;
+
+    // Keys changed on this device that the cloud hasn't confirmed yet. They win
+    // over anything pulled from the cloud, so a save made while a pull is in
+    // flight (or before the page finished loading) is never overwritten.
+    // Persisted so an unsent change survives a reload.
+    const DIRTY_KEY = 'sync_dirty:' + appKey;
+    let dirty = {};
+    try { dirty = JSON.parse(localStorage.getItem(DIRTY_KEY)) || {}; } catch (e) { dirty = {}; }
+    let dirtySeq = Date.now();
+    function saveDirty() { try { origSet(DIRTY_KEY, JSON.stringify(dirty)); } catch (e) {} }
+    function markDirty(k) { dirty[k] = ++dirtySeq; saveDirty(); }
 
     function matches(k) {
       if (!k) return false;
@@ -59,15 +73,15 @@
       return out;
     }
 
-    const origSet = localStorage.setItem.bind(localStorage);
-    const origRemove = localStorage.removeItem.bind(localStorage);
+    var origSet = localStorage.setItem.bind(localStorage);
+    var origRemove = localStorage.removeItem.bind(localStorage);
     localStorage.setItem = function (k, v) {
       origSet(k, v);
-      try { if (!suppressSync && matches(k)) schedulePush(); } catch (e) {}
+      try { if (!suppressSync && matches(k)) { markDirty(k); schedulePush(); } } catch (e) {}
     };
     localStorage.removeItem = function (k) {
       origRemove(k);
-      try { if (!suppressSync && matches(k)) schedulePush(); } catch (e) {}
+      try { if (!suppressSync && matches(k)) { markDirty(k); schedulePush(); } } catch (e) {}
     };
 
     function applyRemote(remote) {
@@ -76,7 +90,7 @@
       let changed = false;
       try {
         for (const k of Object.keys(remote)) {
-          if (!matches(k)) continue;
+          if (!matches(k) || dirty[k]) continue;   // unsent local change wins
           const incoming = JSON.stringify(remote[k]);
           const local = localStorage.getItem(k);
           if (local !== incoming) {
@@ -84,7 +98,7 @@
           }
         }
         for (const k of listAllKeys()) {
-          if (!(k in remote)) {
+          if (!(k in remote) && !dirty[k]) {
             try { origRemove(k); changed = true; } catch (e) {}
           }
         }
@@ -92,27 +106,37 @@
       if (changed && typeof onApplied === 'function') {
         try { onApplied(); } catch (e) {}
       }
+      // Local changes the cloud doesn't have yet → send the merged state up.
+      if (Object.keys(dirty).length) schedulePush();
       return changed;
     }
 
     async function pushNow() {
-      if (!supa) return;
+      if (!supa || !ready) return;
       const state = collect();
       const json = JSON.stringify(state);
-      if (json === lastSyncedJson) return;
+      const sent = Object.assign({}, dirty);
+      if (json === lastSyncedJson) { clearSent(sent); return; }
       try {
         const { error } = await supa.from('app_state').upsert(
           { key: appKey, data: state, updated_at: new Date().toISOString() },
           { onConflict: 'key' }
         );
-        if (!error) lastSyncedJson = json;
+        if (!error) { lastSyncedJson = json; clearSent(sent); }
       } catch (e) {}
+    }
+    // Confirmed by the cloud → no longer dirty (unless changed again meanwhile).
+    function clearSent(sent) {
+      let n = 0;
+      for (const k in sent) if (dirty[k] === sent[k]) { delete dirty[k]; n++; }
+      if (n) saveDirty();
     }
     function schedulePush() {
       clearTimeout(pushTimer);
       pushTimer = setTimeout(pushNow, 250);
     }
     function flushOnUnload() {
+      if (!ready) return;  // unsent changes stay marked dirty and go up next visit
       const state = collect();
       const json = JSON.stringify(state);
       if (json === lastSyncedJson) return;
@@ -134,16 +158,24 @@
 
     (async function init() {
       supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-      try {
-        const { data, error } = await supa
-          .from('app_state').select('data').eq('key', appKey).maybeSingle();
-        if (!error && data && data.data && Object.keys(data.data).length > 0) {
-          lastSyncedJson = JSON.stringify(data.data);
-          applyRemote(data.data);
-        } else if (Object.keys(collect()).length > 0) {
-          schedulePush();
-        }
-      } catch (e) {}
+      // First pull. If it fails (no signal), retry instead of uploading a partial copy.
+      async function firstPull() {
+        try {
+          const { data, error } = await supa
+            .from('app_state').select('data').eq('key', appKey).maybeSingle();
+          if (error) throw error;
+          if (data && data.data && Object.keys(data.data).length > 0) {
+            lastSyncedJson = JSON.stringify(data.data);
+            applyRemote(data.data);
+            if (Object.keys(dirty).length) lastSyncedJson = null;
+          } else if (Object.keys(collect()).length > 0) {
+            lastSyncedJson = null;
+          }
+          ready = true;
+          if (Object.keys(dirty).length || lastSyncedJson === null) schedulePush();
+        } catch (e) { setTimeout(firstPull, 5000); }
+      }
+      await firstPull();
       supa.channel('app_state_' + appKey)
         .on('postgres_changes', {
           event: '*',

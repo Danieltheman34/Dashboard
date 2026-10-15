@@ -723,8 +723,7 @@ body::after {
       const eaten = meals.flatMap((m) => m.items || []).reduce((t, i) => t + (+i.kcal || 0), 0);
       const raw = pick('meals', 'meals:goals', {}) || {};
       const gym = Object.assign({ kcal: 2500, p: 190 }, raw.gym || (raw.kcal ? raw : {}));
-      const type = pick('meals', 'meals:type:' + TODAY, null) || (todaysLifts().length ? 'gym' : 'rest');
-      const goal = (type === 'rest' ? Object.assign({}, gym, raw.rest || {}) : gym);
+      const goal = gym;  // one set of daily goals
       const protein = meals.flatMap((m) => m.items || []).reduce((t, i) => t + (+i.p || 0), 0);
       const left = goal.kcal - eaten;
       $('tdKcal').innerHTML = fmt(Math.abs(left)) + '<small>' + (left >= 0 ? 'kcal left' : 'kcal over') + '</small>';
