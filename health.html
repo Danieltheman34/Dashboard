@@ -830,7 +830,15 @@ main {
     function dayType() { return 'gym'; }
     function goalsFor(k) { return allGoals()[dayType(k)]; }
     function mealsFor(k) { return readLS(DAY_PREFIX + k, []); }
-    function saveMeals(k, arr) { if (arr.length) writeLS(DAY_PREFIX + k, arr); else removeLS(DAY_PREFIX + k); }
+    function saveMeals(k, arr) {
+      if (!arr.length) { removeLS(DAY_PREFIX + k); return true; }
+      if (writeLS(DAY_PREFIX + k, arr)) return true;
+      // Still full after clearing caches → drop meal thumbnails and retry once more.
+      try { localStorage.removeItem(THUMBS_KEY); } catch {}
+      if (writeLS(DAY_PREFIX + k, arr)) return true;
+      alert('Couldn\'t save — your phone\'s storage for this site is full. Close other tabs of the dashboard and try again.');
+      return false;
+    }
     function totals(items) {
       return items.reduce((t, i) => ({ kcal: t.kcal + (+i.kcal || 0), p: t.p + (+i.p || 0), c: t.c + (+i.c || 0), f: t.f + (+i.f || 0), fib: t.fib + (+i.fib || 0) }), { kcal: 0, p: 0, c: 0, f: 0, fib: 0 });
     }
@@ -1087,7 +1095,7 @@ main {
         const k = dayKey(viewDate);
         const m = newMeal(name, [{ name, portion, g, kcal, p, c, f, fib: 0 }], { drink: true });
         m.slot = 'Snack';
-        saveMeals(k, mealsFor(k).concat([m]));
+        if (!saveMeals(k, mealsFor(k).concat([m]))) return;
         closeSheet(); render();
         toast(name + ' added · ' + kcal + ' kcal', () => { saveMeals(k, mealsFor(k).filter((x) => x.id !== m.id)); render(); });
       }));
@@ -1336,7 +1344,7 @@ main {
         meal.items = clean();
         const arr = mealsFor(k).filter((m) => m.id !== meal.id);
         arr.push(meal);
-        saveMeals(k, arr);
+        if (!saveMeals(k, arr)) return;
         if (thumb) saveThumb(meal.id, thumb);
         if (favWanted || isFav()) syncFav(meal.name);
         if (isNew && photo) clearPending();

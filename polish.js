@@ -12,6 +12,29 @@
   if (window.__dxPolish) return;
   window.__dxPolish = true;
 
+  // ---------- Storage guard ----------
+  // iPhone gives each site ~5 MB of localStorage. When it's full a save throws
+  // and data (like a meal) silently disappears. Before giving up, clear copies
+  // that can be re-downloaded and try again. Never touches your own data.
+  const EVICT = ['lyfta_cache_v1', 'sleep:cache', 'meals:thumbs', 'whoop_cache_v1', 'strava_cache_v1'];
+  try {
+    const rawSet = Storage.prototype.setItem;
+    localStorage.setItem = function (k, v) {
+      try { return rawSet.call(localStorage, k, v); }
+      catch (e) {
+        for (const x of EVICT) {
+          if (x === k || localStorage.getItem(x) == null) continue;
+          try { localStorage.removeItem(x); } catch (_) {}
+          try { return rawSet.call(localStorage, k, v); } catch (_) {}
+        }
+        try { window.dispatchEvent(new CustomEvent('dash:storage-full', { detail: { key: k } })); } catch (_) {}
+        throw e;
+      }
+    };
+  } catch (_) {}
+  // Old, oversized Lyfta copies (before it was slimmed) → drop; Fitness re-downloads.
+  try { const c = localStorage.getItem('lyfta_cache_v1'); if (c && c.length > 250000) localStorage.removeItem('lyfta_cache_v1'); } catch (_) {}
+
   const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const root = document.documentElement;
   if (!reduce) root.classList.add('dx-intro');

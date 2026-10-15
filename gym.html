@@ -2012,13 +2012,19 @@ img, video, canvas, svg { max-width: 100%; }
       }
       return all.sort((a, b) => wDate(b) - wDate(a));
     }
+    // Only the fields this page uses — keeps the saved copy small on the phone.
+    function slimWorkouts(list) {
+      return list.map((w) => ({ id: w.id, title: w.title, workout_perform_date: w.workout_perform_date, body_weight: w.body_weight, total_volume: w.total_volume,
+        exercises: (w.exercises || []).map((ex) => ({ exercise_id: ex.exercise_id, excercise_name: ex.excercise_name, exercise_type: ex.exercise_type, exercise_image: ex.exercise_image,
+          sets: (ex.sets || []).map((s) => { const o = {}; ['weight', 'reps', 'duration', 'distance', 'record_type'].forEach((f) => { if (s[f] !== undefined && s[f] !== '' && s[f] !== null) o[f] = s[f]; }); return o; }) })) }));
+    }
     async function sync() {
       try {
         setSync(false, 'syncing…');
         const fresh = await fetchWorkouts();
         const changed = JSON.stringify(fresh.map((w) => [w.id, wSets(w)])) !== JSON.stringify(workouts.map((w) => [w.id, wSets(w)]));
         workouts = fresh;
-        try { localStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), workouts })); } catch {}
+        try { localStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), workouts: slimWorkouts(workouts) })); } catch {}
         $('trSetup').innerHTML = '';
         let added = importToCoach();
         if (added < 0) { added = 0; setTimeout(() => { if (importToCoach() > 0) renderAllTr(); }, 5000); }
